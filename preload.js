@@ -12,4 +12,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onOpenSettings: (cb) => { const h = () => cb(); ipcRenderer.on('open-settings', h); return () => ipcRenderer.removeListener('open-settings', h); },
   onTodosChanged: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on("todos-changed", h); return () => ipcRenderer.removeListener("todos-changed", h); },
   autostart: { get: () => ipcRenderer.invoke("autostart:get"), set: (v) => ipcRenderer.invoke("autostart:set", v) },
+  win: { minimize: () => ipcRenderer.invoke("win:minimize"), maximize: () => ipcRenderer.invoke("win:maximize"), close: () => ipcRenderer.invoke("win:close") },
 });

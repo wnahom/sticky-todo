@@ -59,7 +59,8 @@ let tray = null;
 function createMain() {
   mainWin = new BrowserWindow({
     width: 900, height: 620, minWidth: 700, minHeight: 500,
-    title: "Sticky Todo",
+    frame: false, transparent: true,
+    title: "便签待办",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   mainWin.loadFile(path.join(__dirname, "app.html"));
@@ -148,6 +149,9 @@ function setupIPC() {
   ipcMain.handle("autostart:set", (_, enable) => {
     try { app.setLoginItemSettings({ openAtLogin: enable }); return true; } catch { return false; }
   });
+  ipcMain.handle("win:minimize", () => { if (mainWin) mainWin.minimize(); });
+  ipcMain.handle("win:maximize", () => { if (mainWin) { mainWin.isMaximized() ? mainWin.unmaximize() : mainWin.maximize(); } });
+  ipcMain.handle("win:close", () => { if (mainWin) mainWin.close(); });
 }
 
 function notify() {
@@ -156,7 +160,7 @@ function notify() {
   if (tileWin && !tileWin.isDestroyed()) tileWin.webContents.send("todos-changed", d);
 }
 
-function createMenu() {
+function createMenu() { Menu.setApplicationMenu(null); return; /*
   const template = [
     {
       label: '便签待办',

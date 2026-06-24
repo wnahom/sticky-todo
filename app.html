@@ -14,16 +14,16 @@ body{background:var(--bg);color:var(--text);overflow:hidden;height:100vh;-webkit
 header{display:flex;align-items:center;height:44px;background:var(--panel);border-bottom:1px solid var(--border);padding:0 12px;cursor:default}
 header .title{flex:1;font-size:14px;font-weight:600}
 header .actions{display:flex;gap:4px}
-header .btn{width:32px;height:32px;border:none;border-radius:6px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;color:var(--text);opacity:.8;background:rgba(0,0,0,.04)}
-/* 按钮图形 */
-.bi-grid,.bi-gear{display:inline-block;width:16px;height:16px;position:relative}
-.bi-grid::before,.bi-grid::after,.bi-gear::before,.bi-gear::after{content:"";position:absolute;background:var(--text);border-radius:1px}
-.bi-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:middle;opacity:.6}
-.bi-grid::before{top:1px;left:1px;width:6px;height:6px;box-shadow:7px 0 0 0 var(--text),0 7px 0 0 var(--text),7px 7px 0 0 var(--text)}
-.bi-grid::after{display:none}
-/* 齿轮 (设置): 圆+十字 */
-.bi-gear::before{top:5px;left:5px;width:6px;height:6px;border-radius:50%;background:var(--text)}
-.bi-gear::after{top:3px;left:7px;width:2px;height:10px;background:var(--text);border-radius:1px;box-shadow:-4px 0 0 0 var(--text),4px 0 0 0 var(--text),0 -4px 0 0 var(--text),0 4px 0 0 var(--text)}
+header .btn{width:32px;height:32px;border:none;border-radius:6px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;color:var(--text);opacity:.7}
+header .btn:hover{background:var(--hover)}
+header .btn.close:hover{background:#fde8e8}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;padding:6px 12px;gap:8px}
+.toolbar input[type=text]{flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--panel);outline:none;transition:.15s}
+.toolbar input[type=text]:focus{border-color:var(--accent)}
+.toolbar select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--panel);cursor:pointer;outline:none}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:600}
 
 /* Input */
 .input-area{padding:4px 12px 8px}
@@ -128,10 +128,10 @@ body.tile-mode .hide-in-tile{display:none!important}
 <div id="mainArea" class="hide-in-tile">
 <div class="app">
   <header>
-    <span class="title">◈ 便签待办</span>
+    <span class="title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-3px"><circle cx="12" cy="12" r="3"/><path d="M12 2v7m0 6v7"/></svg>便签待办</span>
     <div class="actions">
-      <button class="btn" id="btnTile" title="磁贴 (Ctrl+Shift+Space)">⊞</button>
-      <button class="btn" id="btnSettings" title="设置">⚙</button>
+      <button class="btn" id="btnTile" title="磁贴 (Ctrl+Shift+Space)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><rect x="13.5" y="13.5" width="7" height="7" rx="1"/></svg></button>
+      <button class="btn" id="btnSettings" title="设置"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
   </header>
 

@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, Notification, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, Notification, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -69,8 +69,8 @@ function createMain() {
 function createTile() {
   const cfg = loadConfig();
   tileWin = new BrowserWindow({
-    width: 320, height: 500, frame: false, transparent: true,
-    alwaysOnTop: true, skipTaskbar: true, resizable: true,
+    width: 260, height: 360, frame: false, transparent: true,
+    alwaysOnTop: true, skipTaskbar: true, resizable: false,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   tileWin.loadFile(path.join(__dirname, "app.html"), { hash: "/tile" });

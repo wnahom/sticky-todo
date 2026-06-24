@@ -211,6 +211,7 @@ let editingId = null, alarmTargetId = null, currentFilter = "all";
 const $ = id => document.getElementById(id);
 const esc = s => {const d=document.createElement("div");d.textContent=s;return d.innerHTML};
 const fmt = iso => {if(!iso)return"";const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
+const fmtDate = iso => {if(!iso)return"";const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()}`};
 const over = iso => iso && new Date(iso).getTime() < Date.now();
 
 async function loadData() { todos = await fetchTodos(); render(); }
@@ -243,7 +244,7 @@ function render() {
           <div class="check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
           <div class="content">
             <div class="text" data-action="edit">${esc(t.text)}</div>
-            <div class="meta">${t.alarmEnabled&&t.alarmTime?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.alarmTime)}</span>`:t.dueDate?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.dueDate)}</span>`:""}</div>
+            <div class="meta">${t.alarmEnabled&&t.alarmTime?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.alarmTime)}</span>`:t.dueDate?`<span class="due ${due&&!t.done?"over":""}">${fmtDate(t.dueDate)}</span>`:""}</div>
           </div>
           <div class="actions">
             <button data-action="alarm" title="提醒"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="11" r="6"/><path d="M10 8v3l2 1.5"/></svg></button>
@@ -269,7 +270,7 @@ function renderTile() {
     return `<div class="tile-item ${t.done?"done":""} ${dueTile&&!t.done?"overdue":""}" data-id="${t.id}">
       <div class="tile-check" data-action="toggle">${t.done?"✓":""}</div>
       <span class="tile-text">${esc(t.text)}</span>
-      ${showMeta?`<span class="tile-meta ${dueTile&&!t.done?"over":""}">${t.alarmEnabled&&t.alarmTime?timeStr:d?`${d.getMonth()+1}/${d.getDate()}`:""}</span>`:""}
+      ${showMeta?`<span class="tile-meta ${dueTile&&!t.done?"over":""}">${t.alarmEnabled&&t.alarmTime?timeStr:d?fmtDate(t.dueDate):""}</span>`:""}
     </div>`;
   }).join("");
 }

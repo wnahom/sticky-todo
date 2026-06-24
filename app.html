@@ -1,0 +1,545 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sticky Todo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f5f0eb;--panel:#fff;--hover:#ede8e0;--text:#2c2c2c;--soft:#666;--faint:#999;--border:#e0d8ce;--accent:#c49a6c;--accent-light:#f0e6d8;--danger:#e74c3c;--success:#27ae60;--shadow:0 2px 12px rgba(0,0,0,.08);--radius:10px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+body{background:var(--bg);color:var(--text);overflow:hidden;height:100vh;-webkit-user-select:none;user-select:none}
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* Header */
+header{display:flex;align-items:center;height:44px;background:var(--panel);border-bottom:1px solid var(--border);padding:0 12px;cursor:default}
+header .title{flex:1;font-size:14px;font-weight:600}
+header .actions{display:flex;gap:4px}
+header .btn{width:32px;height:32px;border:none;background:transparent;border-radius:6px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+header .btn:hover{background:var(--hover)}
+header .btn.close:hover{background:#fde8e8}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;padding:6px 12px;gap:8px}
+.toolbar input[type=text]{flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--panel);outline:none;transition:.15s}
+.toolbar input[type=text]:focus{border-color:var(--accent)}
+.toolbar select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--panel);cursor:pointer;outline:none}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:600}
+
+/* Input */
+.input-area{padding:4px 12px 8px}
+.input-area input{width:100%;padding:10px 14px;border:2px dashed var(--border);border-radius:var(--radius);font-size:14px;font-family:inherit;background:var(--panel);outline:none;transition:.15s}
+.input-area input:focus{border-color:var(--accent);border-style:solid}
+.input-area input::placeholder{color:var(--faint)}
+
+/* List */
+.list{flex:1;overflow-y:auto;padding:4px 10px 10px}
+.list::-webkit-scrollbar{width:4px}
+.list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+.item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:4px;background:var(--panel);border-radius:var(--radius);border:1px solid transparent;transition:.15s;cursor:default;position:relative}
+.item:hover{border-color:var(--border);box-shadow:var(--shadow)}
+.item.done{opacity:.55}
+.item.overdue{border-left:3px solid var(--danger)}
+.item.highlight{animation:hl 2s ease-out}
+@keyframes hl{0%,30%{background:#fef3e2;border-color:var(--accent)}100%{background:var(--panel);border-color:transparent}}
+
+.check{width:20px;height:20px;min-width:20px;border:2px solid var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:.15s;color:#fff;margin-top:2px}
+.check:hover{border-color:var(--accent)}
+.check.checked{background:var(--success);border-color:var(--success)}
+
+.content{flex:1;min-width:0}
+.text{font-size:14px;line-height:1.5;word-break:break-word;cursor:text}
+.done .text{text-decoration:line-through;color:var(--faint)}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;font-size:11px;color:var(--faint)}
+.meta .due{display:inline-flex;align-items:center;gap:2px}
+.meta .due.over{color:var(--danger);font-weight:600}
+
+.actions{display:flex;gap:2px;opacity:0;transition:.15s}
+.item:hover .actions{opacity:1}
+.actions button{width:28px;height:28px;border:none;background:transparent;border-radius:5px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.actions button:hover{background:var(--hover)}
+.actions button.del:hover{background:#fde8e8}
+
+.edit-input{width:100%;padding:4px 8px;border:2px solid var(--accent);border-radius:5px;font-size:14px;font-family:inherit;outline:none;background:#fff}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;color:var(--faint)}
+.empty .icon{font-size:48px;margin-bottom:12px;opacity:.4}
+.empty .txt{font-size:14px}
+
+/* Tile window styles */
+body.tile-mode{background:rgba(255,248,240,.92)}
+.tile-header{display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid rgba(196,154,108,.2);font-size:11px;color:var(--soft);font-weight:600}
+.tile-header .actions{margin-left:auto}
+.tile-list{flex:1;overflow-y:auto;padding:4px 6px}
+.tile-item{display:flex;align-items:flex-start;gap:6px;padding:5px 4px;border-bottom:1px solid rgba(0,0,0,.04);cursor:default;font-size:12px;line-height:1.4}
+.tile-item.done{opacity:.4}
+.tile-check{width:13px;height:13px;min-width:13px;border:1.5px solid rgba(196,154,108,.3);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:7px;cursor:pointer;transition:.12s;color:#fff;margin-top:2px}
+.tile-check:hover{border-color:var(--accent)}
+.tile-check.checked{background:var(--success);border-color:var(--success)}
+.tile-meta{font-size:10px;color:var(--faint);white-space:nowrap;margin-left:auto}
+
+/* Overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:100}
+.overlay.hidden{display:none}
+.panel{background:var(--panel);border-radius:12px;padding:24px;width:380px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.panel h2{font-size:18px;margin-bottom:20px}
+.row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.row label{min-width:100px;font-size:13px;color:var(--soft)}
+.row input[type=text],.row input[type=date],.row input[type=time]{flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:#fff;color:var(--text)}
+.row input:focus{border-color:var(--accent)}
+.row input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.range-group{display:flex;align-items:center;gap:8px;flex:1}
+.range-group span{font-size:13px;min-width:30px;text-align:right;color:var(--soft)}
+.hint{font-size:11px;color:var(--faint)}
+.footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.btn{padding:8px 20px;border:none;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;transition:.15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#b8895c}
+.btn-secondary{background:var(--hover);color:var(--soft)}
+.btn-secondary:hover{background:var(--border)}
+
+/* Tabs for main/tile switching */
+.view-tabs{display:flex;border-bottom:1px solid var(--border)}
+.view-tab{padding:8px 16px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;color:var(--faint)}
+.view-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.view-tab:hover{color:var(--soft)}
+
+#mainView,#tileView{display:none;flex-direction:column;height:100vh}
+#mainView.active,#tileView.active{display:flex}
+
+/* Corner marks for tile */
+.corner-marks{pointer-events:none;position:fixed;inset:0}
+.corner-marks svg{position:absolute}
+.corner-tl{top:4px;left:4px}.corner-tr{top:4px;right:4px}.corner-bl{bottom:4px;left:4px}.corner-br{bottom:4px;right:4px}
+</style>
+</head>
+<body>
+
+<!-- 主视图 -->
+<div id="mainView" class="active">
+  <header>
+    <span class="title">📌 Sticky Todo</span>
+    <div class="actions">
+      <button class="btn" id="btnTile" title="磁贴模式">📋</button>
+      <button class="btn" id="btnSettings" title="设置">⚙️</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <input type="text" id="searchInput" placeholder="搜索待办...">
+    <select id="filterSelect">
+      <option value="all">全部</option>
+      <option value="active">未完成</option>
+      <option value="done">已完成</option>
+      <option value="alarmed">有提醒</option>
+    </select>
+    <span class="badge" id="countBadge">0</span>
+  </div>
+
+  <div class="input-area">
+    <input type="text" id="todoInput" placeholder="输入新待办，按 Enter 添加..." autofocus>
+  </div>
+
+  <div class="list" id="todoList"></div>
+</div>
+
+<!-- 磁贴视图 -->
+<div id="tileView">
+  <div class="corner-marks">
+    <svg class="corner-tl" width="10" height="10" viewBox="0 0 10 10"><path d="M0,8 L0,0 L8,0" stroke="rgba(196,154,108,0.3)" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg class="corner-tr" width="10" height="10" viewBox="0 0 10 10"><path d="M0,0 L10,0 L10,10" stroke="rgba(196,154,108,0.3)" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg class="corner-bl" width="10" height="10" viewBox="0 0 10 10"><path d="M0,0 L0,10 L10,10" stroke="rgba(196,154,108,0.3)" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg class="corner-br" width="10" height="10" viewBox="0 0 10 10"><path d="M10,0 L10,10 L0,10" stroke="rgba(196,154,108,0.3)" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <div class="tile-header">
+    📌 Sticky Todo
+    <div class="actions">
+      <button class="btn" id="btnRefreshTile" style="width:auto;height:auto;padding:2px 6px;font-size:11px">🔄</button>
+      <button class="btn" id="btnBackToMain" style="width:auto;height:auto;padding:2px 6px;font-size:11px">✕</button>
+    </div>
+  </div>
+  <div class="tile-list" id="tileList"></div>
+</div>
+
+<!-- 设置面板 -->
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="panel">
+    <h2>⚙️ 设置</h2>
+    <div class="row">
+      <label>磁贴透明度</label>
+      <div class="range-group">
+        <input type="range" id="settingOpacity" min="0.3" max="1" step="0.05" value="0.92">
+        <span id="opacityValue">0.92</span>
+      </div>
+    </div>
+    <div class="row">
+      <label>闹钟声音</label>
+      <input type="checkbox" id="settingAlarmSound" checked>
+    </div>
+    <span class="hint">数据保存在 data.json | 快捷键设为浏览器标签切换</span>
+    <div class="footer">
+      <button class="btn btn-primary" id="btnCloseSettings">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 闹钟面板 -->
+<div class="overlay hidden" id="alarmOverlay">
+  <div class="panel">
+    <h3>⏰ 设置提醒</h3>
+    <div class="row">
+      <label>截止日期</label>
+      <input type="date" id="alarmDate">
+    </div>
+    <div class="row">
+      <label>提醒时间</label>
+      <input type="time" id="alarmTime">
+    </div>
+    <div class="row">
+      <label>启用闹钟</label>
+      <input type="checkbox" id="alarmEnabled" checked>
+    </div>
+    <div class="footer">
+      <button class="btn btn-secondary" id="btnAlarmCancel">取消</button>
+      <button class="btn btn-primary" id="btnAlarmSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================
+// Data
+// ================================
+let todos = [];
+let editingId = null;
+let alarmTargetId = null;
+let currentFilter = "all";
+let alarmInterval = null;
+
+async function loadData() {
+  try {
+    const r = await fetch("/data");
+    todos = await r.json();
+  } catch { todos = []; }
+  render();
+}
+
+async function saveData() {
+  await fetch("/data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(todos),
+  });
+}
+
+// ================================
+// Render
+// ================================
+function $(id) { return document.getElementById(id); }
+
+function escape(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+
+function isOver(iso) { return iso && new Date(iso).getTime() < Date.now(); }
+
+function getFiltered() {
+  const q = $("searchInput").value.toLowerCase().trim();
+  return todos.filter(t => {
+    if (q && !t.text.toLowerCase().includes(q)) return false;
+    if (currentFilter === "active" && t.done) return false;
+    if (currentFilter === "done" && !t.done) return false;
+    if (currentFilter === "alarmed" && !t.alarmEnabled) return false;
+    return true;
+  });
+}
+
+function render() {
+  const filtered = getFiltered();
+  const active = todos.filter(t => !t.done).length;
+  $("countBadge").textContent = `${active}/${todos.length}`;
+
+  const list = $("todoList");
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="icon">📋</div><div class="txt">${todos.length===0?"还没有待办事项":"没有匹配的待办"}</div></div>`;
+    renderTile();
+    return;
+  }
+
+  list.innerHTML = filtered.map(t => {
+    const due = t.dueDate && isOver(t.dueDate);
+    return `<div class="item ${t.done?"done":""} ${due&&!t.done?"overdue":""}" data-id="${t.id}">
+      <div class="check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
+      <div class="content">
+        <div class="text" data-action="edit">${escape(t.text)}</div>
+        <div class="meta">
+          ${t.dueDate?`<span class="due ${due&&!t.done?"over":""}">📅 ${fmtDate(t.dueDate)}</span>`:""}
+          ${t.alarmEnabled&&t.alarmTime?`<span>⏰ ${fmtDate(t.alarmTime)}</span>`:""}
+        </div>
+      </div>
+      <div class="actions">
+        <button data-action="alarm" title="提醒">⏰</button>
+        <button class="del" data-action="delete" title="删除">🗑</button>
+      </div>
+    </div>`;
+  }).join("");
+  renderTile();
+}
+
+function renderTile() {
+  const list = $("tileList");
+  const active = todos.filter(t => !t.done);
+  if (active.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="icon">📋</div><div class="txt" style="font-size:12px">全部完成 ✓</div></div>`;
+    return;
+  }
+  list.innerHTML = active.map(t => {
+    const due = t.dueDate && isOver(t.dueDate);
+    const d = t.dueDate ? new Date(t.dueDate) : null;
+    const ds = d ? `${d.getMonth()+1}/${d.getDate()}` : "";
+    return `<div class="tile-item ${t.done?"done":""}" data-id="${t.id}">
+      <div class="tile-check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
+      <span>${escape(t.text)}</span>
+      <span class="tile-meta">${ds}${t.alarmEnabled?" ⏰":""}</span>
+    </div>`;
+  }).join("");
+}
+
+// ================================
+// Events
+// ================================
+$("todoInput").addEventListener("keydown", async e => {
+  if (e.key === "Enter") {
+    const text = $("todoInput").value.trim();
+    if (!text) return;
+    todos.unshift({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      text, done: false, createdAt: new Date().toISOString(),
+      dueDate: null, alarmEnabled: false, alarmTime: null
+    });
+    $("todoInput").value = "";
+    await saveData();
+    render();
+  }
+});
+
+$("todoList").addEventListener("click", async e => {
+  const item = e.target.closest(".item");
+  if (!item) return;
+  const id = item.dataset.id;
+  const act = e.target.closest("[data-action]")?.dataset?.action;
+
+  if (act === "toggle") {
+    const t = todos.find(x => x.id === id);
+    if (t) { t.done = !t.done; await saveData(); render(); }
+  } else if (act === "delete") {
+    todos = todos.filter(x => x.id !== id);
+    await saveData(); render();
+  } else if (act === "alarm") {
+    openAlarm(id);
+  } else if (act === "edit") {
+    startEdit(id);
+  }
+});
+
+$("todoList").addEventListener("dblclick", e => {
+  const item = e.target.closest(".item");
+  if (item) startEdit(item.dataset.id);
+});
+
+$("tileList").addEventListener("click", async e => {
+  const item = e.target.closest(".tile-item");
+  if (!item) return;
+  const act = e.target.closest("[data-action]");
+  if (act) {
+    const id = item.dataset.id;
+    const t = todos.find(x => x.id === id);
+    if (t) { t.done = !t.done; await saveData(); render(); }
+  }
+});
+
+function startEdit(id) {
+  if (editingId) return;
+  const t = todos.find(x => x.id === id);
+  if (!t) return;
+  editingId = id;
+  const item = document.querySelector(`.item[data-id="${id}"]`);
+  if (!item) return;
+  const textEl = item.querySelector(".text");
+  const inp = document.createElement("input");
+  inp.className = "edit-input"; inp.value = t.text;
+  textEl.replaceWith(inp); inp.focus(); inp.select();
+
+  async function finish() {
+    const v = inp.value.trim();
+    if (v && v !== t.text) { t.text = v; await saveData(); }
+    render();
+    editingId = null;
+  }
+  inp.addEventListener("blur", finish);
+  inp.addEventListener("keydown", e => {
+    if (e.key === "Enter") inp.blur();
+    if (e.key === "Escape") { render(); editingId = null; }
+  });
+}
+
+// Search & filter
+$("searchInput").addEventListener("input", render);
+$("filterSelect").addEventListener("change", () => { currentFilter = $("filterSelect").value; render(); });
+
+// ================================
+// Alarm panel
+// ================================
+function openAlarm(id) {
+  alarmTargetId = id;
+  const t = todos.find(x => x.id === id);
+  if (!t) return;
+  const now = new Date();
+  $("alarmDate").value = t.alarmTime ? new Date(t.alarmTime).toISOString().slice(0,10) : now.toISOString().slice(0,10);
+  $("alarmTime").value = t.alarmTime ? `${String(new Date(t.alarmTime).getHours()).padStart(2,"0")}:${String(new Date(t.alarmTime).getMinutes()).padStart(2,"0")}` : "09:00";
+  $("alarmEnabled").checked = t.alarmEnabled !== false;
+  $("alarmOverlay").classList.remove("hidden");
+}
+
+$("btnAlarmSave").addEventListener("click", async () => {
+  if (!alarmTargetId) return;
+  const t = todos.find(x => x.id === alarmTargetId);
+  if (!t) return;
+  const date = $("alarmDate").value;
+  const time = $("alarmTime").value;
+  t.dueDate = date ? new Date(`${date}T23:59:59`).toISOString() : null;
+  t.alarmTime = date && time ? new Date(`${date}T${time}:00`).toISOString() : null;
+  t.alarmEnabled = $("alarmEnabled").checked;
+  await saveData(); render();
+  $("alarmOverlay").classList.add("hidden");
+  alarmTargetId = null;
+});
+
+$("btnAlarmCancel").addEventListener("click", () => {
+  $("alarmOverlay").classList.add("hidden");
+  alarmTargetId = null;
+});
+
+// ================================
+// Settings
+// ================================
+$("btnSettings").addEventListener("click", async () => {
+  try {
+    const r = await fetch("/config");
+    const cfg = await r.json();
+    $("settingOpacity").value = cfg.opacity || 0.92;
+    $("opacityValue").textContent = cfg.opacity || 0.92;
+    $("settingAlarmSound").checked = cfg.alarmSound !== false;
+  } catch {}
+  $("settingsOverlay").classList.remove("hidden");
+});
+
+$("btnCloseSettings").addEventListener("click", async () => {
+  await fetch("/config", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      opacity: parseFloat($("settingOpacity").value),
+      alarmSound: $("settingAlarmSound").checked,
+      alwaysOnTop: true,
+    })
+  });
+  // Apply tile opacity
+  document.getElementById("tileView").style.opacity = $("settingOpacity").value;
+  $("settingsOverlay").classList.add("hidden");
+});
+
+$("settingOpacity").addEventListener("input", () => {
+  $("opacityValue").textContent = $("settingOpacity").value;
+});
+
+// View switching
+$("btnTile").addEventListener("click", () => {
+  $("mainView").classList.remove("active");
+  $("tileView").classList.add("active");
+  document.body.classList.add("tile-mode");
+  renderTile();
+});
+
+$("btnBackToMain").addEventListener("click", () => {
+  $("tileView").classList.remove("active");
+  $("mainView").classList.add("active");
+  document.body.classList.remove("tile-mode");
+});
+
+$("btnRefreshTile").addEventListener("click", renderTile);
+
+// Keyboard shortcuts
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    document.querySelectorAll(".overlay:not(.hidden)").forEach(el => el.classList.add("hidden"));
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+    e.preventDefault();
+    $("todoInput").focus();
+  }
+  // Alt+T toggle tile mode
+  if (e.altKey && e.key === "t") {
+    e.preventDefault();
+    $("btnTile").click();
+  }
+  // Alt+M back to main
+  if (e.altKey && e.key === "m") {
+    e.preventDefault();
+    $("btnBackToMain").click();
+  }
+});
+
+// ================================
+// Alarm Engine (browser notifications)
+// ================================
+async function startAlarmEngine() {
+  if (Notification.permission === "default") {
+    await Notification.requestPermission();
+  }
+  if (alarmInterval) clearInterval(alarmInterval);
+  const notified = new Set();
+
+  alarmInterval = setInterval(() => {
+    const now = Date.now();
+    todos.forEach(t => {
+      if (t.done || !t.alarmEnabled || !t.alarmTime) return;
+      const ms = new Date(t.alarmTime).getTime();
+      if (Math.abs(now - ms) < 30000 && !notified.has(t.id)) {
+        notified.add(t.id);
+        try {
+          const n = new Notification("⏰ 待办提醒", { body: t.text });
+          n.onclick = () => { window.focus(); };
+        } catch {}
+      }
+    });
+  }, 10000);
+
+  // Request notification permission on load
+  if (Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+// ================================
+// Init
+// ================================
+// Close overlays on backdrop click
+document.querySelectorAll(".overlay").forEach(el => {
+  el.addEventListener("click", e => { if (e.target === el) el.classList.add("hidden"); });
+});
+
+loadData();
+startAlarmEngine();
+</script>
+</body>
+</html>

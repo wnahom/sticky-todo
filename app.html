@@ -127,35 +127,18 @@ body.tile-mode .hide-in-tile{display:none!important}
 <!-- 主要区域 — 在 tile 模式下隐藏 -->
 <div id="mainArea" class="hide-in-tile">
 <div class="app">
-  <header>
+  <header style="-webkit-app-region:drag">
     <span class="title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-3px"><circle cx="12" cy="12" r="3"/><path d="M12 2v7m0 6v7"/></svg>便签待办</span>
-    <div class="actions">
-      <button class="btn" id="btnTile" title="磁贴 (Ctrl+Shift+Space)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><rect x="13.5" y="13.5" width="7" height="7" rx="1"/></svg></button>
-      <button class="btn" id="btnSettings" title="设置"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <div class="actions" style="-webkit-app-region:no-drag">
+      <button class="btn" id="btnTile" title="磁贴">⊞</button>
+      <button class="btn" id="btnSettings" title="设置">⚙</button>
+      <button class="btn" id="btnCloseWin" title="关闭">✕</button>
     </div>
   </header>
-
-  <div class="toolbar">
-    <input type="text" id="searchInput" placeholder="搜索待办...">
-    <select id="filterSelect">
-      <option value="all">全部</option>
-      <option value="active">未完成</option>
-      <option value="done">已完成</option>
-      <option value="alarmed">有提醒</option>
-    </select>
-    <span class="badge" id="countBadge">0</span>
-  </div>
 
   <div class="input-area">
     <input type="text" id="todoInput" placeholder="输入新待办，按 Enter 添加..." autofocus>
   </div>
-
-  <div class="list" id="todoList"></div>
-</div>
-</div>
-
-<!-- 磁贴区域 -->
-<div id="tileArea" style="display:none">
   <div class="tile-header">
     <button class="tile-pinbtn" id="tilePinBtn" title="切换置顶"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor" stroke="none"><path d="M10 1a1 1 0 0 1 .7.3l4 4a1 1 0 0 1-1.4 1.4L11 4.4V9l3 3v2H6v-2l3-3V4.4L6.7 6.7a1 1 0 1 1-1.4-1.4l4-4A1 1 0 0 1 10 1zM5 14h10v2H5v-2z"/></svg></button>
     <span class="tile-title">Sticky</span>
@@ -221,7 +204,7 @@ async function loadData() { todos = await fetchTodos(); render(); }
 async function saveData() { /* 实际通过 IPC 实时保存，这里仅做同步 */ }
 
 function getFiltered() {
-  const q = $("searchInput").value.toLowerCase().trim();
+  const q = "";
   return todos.filter(t => {
     if(q && !t.text.toLowerCase().includes(q)) return false;
     if(currentFilter==="active" && t.done) return false;
@@ -249,7 +232,7 @@ function render() {
             <div class="text" data-action="edit">${esc(t.text)}</div>
             <div class="meta">${t.alarmEnabled&&t.alarmTime?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.alarmTime)}</span>`:t.dueDate?`<span class="due ${due&&!t.done?"over":""}">${fmtDate(t.dueDate)}</span>`:""}</div>
           </div>
-          <div class="actions">
+    <div class="actions" style="-webkit-app-region:no-drag">
             <button data-action="alarm" title="提醒"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="11" r="6"/><path d="M10 8v3l2 1.5"/></svg></button>
             <button class="del" data-action="delete" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>

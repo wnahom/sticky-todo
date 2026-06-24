@@ -59,6 +59,7 @@ let tray = null;
 function createMain() {
   mainWin = new BrowserWindow({
     width: 900, height: 620, minWidth: 700, minHeight: 500,
+    frame: false,
     title: "便签待办",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });

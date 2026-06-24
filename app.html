@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -382,22 +382,22 @@ $("btnAlarmCancel").addEventListener("click",()=>{$("alarmOverlay").classList.ad
 // 设置
 // ================================
 $("btnSettings").addEventListener("click", async () => {
-  try { const c=await getConfig(); $("settingOpacity").value=c.opacity||0.92; $("opacityValue").textContent=c.opacity||0.92; $("settingAlarmSound").checked=c.alarmSound!==false; } catch {}
+  try { const c=await getConfig(); $("settingOpacity").value=c.opacity||0.92; $("opacityValue").textContent=c.opacity||0.92; $("settingAlarmSound").checked=c.alarmSound!==false; $("settingTW").value=c.tileWidth||260; $("twVal").textContent=c.tileWidth||260; $("settingTH").value=c.tileHeight||360; $("thVal").textContent=c.tileHeight||360; if(isElectron){api.autostart.get().then(v=>{$("settingAutoStart").checked=v})} } catch {}
   $("settingsOverlay").classList.remove("hidden");
 });
 $("btnCloseSettings").addEventListener("click", async () => {
-  await saveCfg({opacity:parseFloat($("settingOpacity").value),alarmSound:$("settingAlarmSound").checked});
+  if(isElectron)api.autostart.set($("settingAutoStart").checked);
+  const nw=parseInt($("settingTW").value),nh=parseInt($("settingTH").value);
+  await saveCfg({opacity:parseFloat($("settingOpacity").value),alarmSound:$("settingAlarmSound").checked,tileWidth:nw,tileHeight:nh});
+  if(isElectron)api.tile.resize(nw,nh);
   $("settingsOverlay").classList.add("hidden");
 });
-$("settingOpacity").addEventListener("input",()=>{$("opacityValue").textContent=$("settingOpacity").value});
-
-// Tile toggle
 $("btnTile").addEventListener("click", () => {
   if(isElectron) api.tile.toggle();
 });
-
-// ================================
-// 快捷键
+$("settingOpacity").addEventListener("input",()=>{$("opacityValue").textContent=$("settingOpacity").value});
+$("settingTW").addEventListener("input",()=>{$("twVal").textContent=$("settingTW").value});
+$("settingTH").addEventListener("input",()=>{$("thVal").textContent=$("settingTH").value});
 // ================================
 document.addEventListener("keydown", e => {
   if(e.key==="Escape") document.querySelectorAll(".overlay:not(.hidden)").forEach(el=>el.classList.add("hidden"));
@@ -445,6 +445,8 @@ async function init() {
   }
 }
 
+// 菜单触发的设置
+if(isElectron){api.onOpenSettings(()=>{$("btnSettings").click()})}
 init();
 </script>
 </body>

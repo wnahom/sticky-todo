@@ -90,7 +90,7 @@ body.tile-mode{background:rgba(255,248,240,.92)}
 .tile-text{flex:1;word-break:break-word;min-width:0;color:var(--text)}
 .done .tile-text{text-decoration:line-through;color:var(--faint)}
 .tile-meta{font-size:9px;color:var(--faint);white-space:nowrap;margin-left:4px;opacity:.6}
-.tile-meta.over{color:var(--danger);opacity:1;font-weight:600}.created{font-size:11px;color:var(--faint);opacity:.6;display:inline-flex;align-items:center}
+.tile-meta.over{color:var(--danger);opacity:1;font-weight:600}
 .tile-empty{padding:24px 10px;text-align:center;font-size:11px;color:var(--faint);opacity:.4}
 
 /* Overlay */
@@ -239,12 +239,12 @@ function render() {
     if(!f.length) { list.innerHTML=`<div class="empty"><div class="txt">${todos.length?"没有匹配的待办":"还没有待办事项"}</div></div>`; }
     else {
       list.innerHTML = f.map(t => {
-        const due = t.alarmEnabled && t.alarmTime && new Date(t.alarmTime).getTime() < Date.now();
+        const due = t.dueDate && over(t.dueDate);
         return `<div class="item ${t.done?"done":""} ${due&&!t.done?"overdue":""}" data-id="${t.id}">
           <div class="check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
           <div class="content">
             <div class="text" data-action="edit">${esc(t.text)}</div>
-            <div class="meta">${t.alarmEnabled&&t.alarmTime?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.alarmTime)}</span>`:t.createdAt?`<span class="created"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-1px;margin-right:2px;opacity:.5"><path d="M15 4l4 4M7 17l-1 4 4-1L20 10l-4-4L7 17z"/></svg>${fmtDate(t.createdAt)}</span>`:""}</div>
+            <div class="meta">${t.alarmEnabled&&t.alarmTime?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.alarmTime)}</span>`:t.dueDate?`<span class="due ${due&&!t.done?"over":""}">${fmtDate(t.dueDate)}</span>`:""}</div>
           </div>
           <div class="actions">
             <button data-action="alarm" title="提醒"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="11" r="6"/><path d="M10 8v3l2 1.5"/></svg></button>
@@ -263,14 +263,14 @@ function renderTile() {
   const now = Date.now();
   if(!active.length) { list.innerHTML=`<div class="tile-empty">~ 全部完成 ~</div>`; return; }
   list.innerHTML = active.map(t => {
-    
-    const dueTile = t.alarmEnabled && t.alarmTime && new Date(t.alarmTime).getTime() < now;
+    const d = t.dueDate?new Date(t.dueDate):null;
+    const dueTile = t.dueDate && new Date(t.dueDate).getTime() < now;
     const timeStr = t.alarmTime ? fmt(t.alarmTime) : "";
     const showMeta = d || t.alarmEnabled;
     return `<div class="tile-item ${t.done?"done":""} ${dueTile&&!t.done?"overdue":""}" data-id="${t.id}">
       <div class="tile-check" data-action="toggle">${t.done?"✓":""}</div>
       <span class="tile-text">${esc(t.text)}</span>
-      ${showMeta?`<span class="tile-meta ${dueTile&&!t.done?"over":""}">${t.alarmEnabled&&t.alarmTime?timeStr:fmtDate(t.createdAt):""}</span>`:""}
+      ${showMeta?`<span class="tile-meta ${dueTile&&!t.done?"over":""}">${t.alarmEnabled&&t.alarmTime?timeStr:d?fmtDate(t.dueDate):""}</span>`:""}
     </div>`;
   }).join("");
 }

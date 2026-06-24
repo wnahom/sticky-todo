@@ -99,29 +99,23 @@ body.tile-mode{background:rgba(255,248,240,.92)}
 .btn-secondary{background:var(--hover);color:var(--soft)}
 .btn-secondary:hover{background:var(--border)}
 
-/* Tabs for main/tile switching */
-.view-tabs{display:flex;border-bottom:1px solid var(--border)}
-.view-tab{padding:8px 16px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;color:var(--faint)}
-.view-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
-.view-tab:hover{color:var(--soft)}
-
-#mainView,#tileView{display:none;flex-direction:column;height:100vh}
-#mainView.active,#tileView.active{display:flex}
-
 /* Corner marks for tile */
 .corner-marks{pointer-events:none;position:fixed;inset:0}
 .corner-marks svg{position:absolute}
 .corner-tl{top:4px;left:4px}.corner-tr{top:4px;right:4px}.corner-bl{bottom:4px;left:4px}.corner-br{bottom:4px;right:4px}
+
+/* Tile-only: hide main-area */
+body.tile-mode .hide-in-tile{display:none!important}
 </style>
 </head>
 <body>
-
-<!-- 主视图 -->
-<div id="mainView" class="active">
+<!-- 主要区域 — 在 tile 模式下隐藏 -->
+<div id="mainArea" class="hide-in-tile">
+<div class="app">
   <header>
     <span class="title">📌 Sticky Todo</span>
     <div class="actions">
-      <button class="btn" id="btnTile" title="磁贴模式">📋</button>
+      <button class="btn" id="btnTile" title="磁贴 (Ctrl+Shift+Space)">📋</button>
       <button class="btn" id="btnSettings" title="设置">⚙️</button>
     </div>
   </header>
@@ -143,9 +137,10 @@ body.tile-mode{background:rgba(255,248,240,.92)}
 
   <div class="list" id="todoList"></div>
 </div>
+</div>
 
-<!-- 磁贴视图 -->
-<div id="tileView">
+<!-- 磁贴区域 -->
+<div id="tileArea" style="display:none">
   <div class="corner-marks">
     <svg class="corner-tl" width="10" height="10" viewBox="0 0 10 10"><path d="M0,8 L0,0 L8,0" stroke="rgba(196,154,108,0.3)" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <svg class="corner-tr" width="10" height="10" viewBox="0 0 10 10"><path d="M0,0 L10,0 L10,10" stroke="rgba(196,154,108,0.3)" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -154,10 +149,6 @@ body.tile-mode{background:rgba(255,248,240,.92)}
   </div>
   <div class="tile-header">
     📌 Sticky Todo
-    <div class="actions">
-      <button class="btn" id="btnRefreshTile" style="width:auto;height:auto;padding:2px 6px;font-size:11px">🔄</button>
-      <button class="btn" id="btnBackToMain" style="width:auto;height:auto;padding:2px 6px;font-size:11px">✕</button>
-    </div>
   </div>
   <div class="tile-list" id="tileList"></div>
 </div>
@@ -166,21 +157,9 @@ body.tile-mode{background:rgba(255,248,240,.92)}
 <div class="overlay hidden" id="settingsOverlay">
   <div class="panel">
     <h2>⚙️ 设置</h2>
-    <div class="row">
-      <label>磁贴透明度</label>
-      <div class="range-group">
-        <input type="range" id="settingOpacity" min="0.3" max="1" step="0.05" value="0.92">
-        <span id="opacityValue">0.92</span>
-      </div>
-    </div>
-    <div class="row">
-      <label>闹钟声音</label>
-      <input type="checkbox" id="settingAlarmSound" checked>
-    </div>
-    <span class="hint">数据保存在 data.json | 快捷键设为浏览器标签切换</span>
-    <div class="footer">
-      <button class="btn btn-primary" id="btnCloseSettings">关闭</button>
-    </div>
+    <div class="row"><label>磁贴透明度</label><div class="range-group"><input type="range" id="settingOpacity" min="0.3" max="1" step="0.05" value="0.92"><span id="opacityValue">0.92</span></div></div>
+    <div class="row"><label>闹钟声音</label><input type="checkbox" id="settingAlarmSound" checked></div>
+    <div class="footer"><button class="btn btn-primary" id="btnCloseSettings">关闭</button></div>
   </div>
 </div>
 
@@ -188,358 +167,236 @@ body.tile-mode{background:rgba(255,248,240,.92)}
 <div class="overlay hidden" id="alarmOverlay">
   <div class="panel">
     <h3>⏰ 设置提醒</h3>
-    <div class="row">
-      <label>截止日期</label>
-      <input type="date" id="alarmDate">
-    </div>
-    <div class="row">
-      <label>提醒时间</label>
-      <input type="time" id="alarmTime">
-    </div>
-    <div class="row">
-      <label>启用闹钟</label>
-      <input type="checkbox" id="alarmEnabled" checked>
-    </div>
-    <div class="footer">
-      <button class="btn btn-secondary" id="btnAlarmCancel">取消</button>
-      <button class="btn btn-primary" id="btnAlarmSave">保存</button>
-    </div>
+    <div class="row"><label>截止日期</label><input type="date" id="alarmDate"></div>
+    <div class="row"><label>提醒时间</label><input type="time" id="alarmTime"></div>
+    <div class="row"><label>启用闹钟</label><input type="checkbox" id="alarmEnabled" checked></div>
+    <div class="footer"><button class="btn btn-secondary" id="btnAlarmCancel">取消</button><button class="btn btn-primary" id="btnAlarmSave">保存</button></div>
   </div>
 </div>
 
 <script>
 // ================================
-// Data
+// 适配层 — Electron IPC / fetch 双模式
+// ================================
+const api = window.electronAPI;
+const isElectron = !!api;
+const fetchTodos = () => isElectron ? api.todos.list() : fetch("/data").then(r => r.json());
+const createTodo = text => isElectron ? api.todos.create(text) : fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(null)}).then(()=>{});
+const updateTodo = (id,up) => isElectron ? api.todos.update(id,up) : Promise.resolve();
+const deleteTodo = id => isElectron ? api.todos.delete(id) : Promise.resolve();
+const toggleTodo = id => isElectron ? api.todos.toggle(id) : Promise.resolve();
+const getConfig = () => isElectron ? api.config.get() : fetch("/config").then(r=>r.json());
+const saveCfg = c => isElectron ? api.config.save(c) : fetch("/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(c)});
+
+// ================================
+// 数据 & 渲染
 // ================================
 let todos = [];
-let editingId = null;
-let alarmTargetId = null;
-let currentFilter = "all";
-let alarmInterval = null;
+let editingId = null, alarmTargetId = null, currentFilter = "all";
 
-async function loadData() {
-  try {
-    const r = await fetch("/data");
-    todos = await r.json();
-  } catch { todos = []; }
-  render();
-}
+const $ = id => document.getElementById(id);
+const esc = s => {const d=document.createElement("div");d.textContent=s;return d.innerHTML};
+const fmt = iso => {if(!iso)return"";const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
+const over = iso => iso && new Date(iso).getTime() < Date.now();
 
-async function saveData() {
-  await fetch("/data", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(todos),
-  });
-}
-
-// ================================
-// Render
-// ================================
-function $(id) { return document.getElementById(id); }
-
-function escape(s) {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-function fmtDate(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-}
-
-function isOver(iso) { return iso && new Date(iso).getTime() < Date.now(); }
+async function loadData() { todos = await fetchTodos(); render(); }
+async function saveData() { /* 实际通过 IPC 实时保存，这里仅做同步 */ }
 
 function getFiltered() {
   const q = $("searchInput").value.toLowerCase().trim();
   return todos.filter(t => {
-    if (q && !t.text.toLowerCase().includes(q)) return false;
-    if (currentFilter === "active" && t.done) return false;
-    if (currentFilter === "done" && !t.done) return false;
-    if (currentFilter === "alarmed" && !t.alarmEnabled) return false;
+    if(q && !t.text.toLowerCase().includes(q)) return false;
+    if(currentFilter==="active" && t.done) return false;
+    if(currentFilter==="done" && !t.done) return false;
+    if(currentFilter==="alarmed" && !t.alarmEnabled) return false;
     return true;
   });
 }
 
 function render() {
-  const filtered = getFiltered();
-  const active = todos.filter(t => !t.done).length;
-  $("countBadge").textContent = `${active}/${todos.length}`;
-
-  const list = $("todoList");
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty"><div class="icon">📋</div><div class="txt">${todos.length===0?"还没有待办事项":"没有匹配的待办"}</div></div>`;
-    renderTile();
-    return;
+  // 非 tile 模式才渲染主列表
+  const isTile = document.body.classList.contains("tile-mode");
+  if(!isTile) {
+    const f = getFiltered();
+    const act = todos.filter(t=>!t.done).length;
+    $("countBadge").textContent = `${act}/${todos.length}`;
+    const list = $("todoList");
+    if(!f.length) { list.innerHTML=`<div class="empty"><div class="icon">📋</div><div class="txt">${todos.length?"没有匹配的待办":"还没有待办事项"}</div></div>`; }
+    else {
+      list.innerHTML = f.map(t => {
+        const due = t.dueDate && over(t.dueDate);
+        return `<div class="item ${t.done?"done":""} ${due&&!t.done?"overdue":""}" data-id="${t.id}">
+          <div class="check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
+          <div class="content">
+            <div class="text" data-action="edit">${esc(t.text)}</div>
+            <div class="meta">${t.dueDate?`<span class="due ${due&&!t.done?"over":""}">📅 ${fmt(t.dueDate)}</span>`:""}${t.alarmEnabled&&t.alarmTime?`<span>⏰ ${fmt(t.alarmTime)}</span>`:""}</div>
+          </div>
+          <div class="actions">
+            <button data-action="alarm" title="提醒">⏰</button>
+            <button class="del" data-action="delete" title="删除">🗑</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
   }
-
-  list.innerHTML = filtered.map(t => {
-    const due = t.dueDate && isOver(t.dueDate);
-    return `<div class="item ${t.done?"done":""} ${due&&!t.done?"overdue":""}" data-id="${t.id}">
-      <div class="check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
-      <div class="content">
-        <div class="text" data-action="edit">${escape(t.text)}</div>
-        <div class="meta">
-          ${t.dueDate?`<span class="due ${due&&!t.done?"over":""}">📅 ${fmtDate(t.dueDate)}</span>`:""}
-          ${t.alarmEnabled&&t.alarmTime?`<span>⏰ ${fmtDate(t.alarmTime)}</span>`:""}
-        </div>
-      </div>
-      <div class="actions">
-        <button data-action="alarm" title="提醒">⏰</button>
-        <button class="del" data-action="delete" title="删除">🗑</button>
-      </div>
-    </div>`;
-  }).join("");
   renderTile();
 }
 
 function renderTile() {
   const list = $("tileList");
-  const active = todos.filter(t => !t.done);
-  if (active.length === 0) {
-    list.innerHTML = `<div class="empty"><div class="icon">📋</div><div class="txt" style="font-size:12px">全部完成 ✓</div></div>`;
-    return;
-  }
+  const active = todos.filter(t=>!t.done);
+  if(!active.length) { list.innerHTML=`<div class="empty"><div class="icon">📋</div><div class="txt" style="font-size:12px">全部完成 ✓</div></div>`; return; }
   list.innerHTML = active.map(t => {
-    const due = t.dueDate && isOver(t.dueDate);
-    const d = t.dueDate ? new Date(t.dueDate) : null;
-    const ds = d ? `${d.getMonth()+1}/${d.getDate()}` : "";
-    return `<div class="tile-item ${t.done?"done":""}" data-id="${t.id}">
-      <div class="tile-check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
-      <span>${escape(t.text)}</span>
-      <span class="tile-meta">${ds}${t.alarmEnabled?" ⏰":""}</span>
+    const d = t.dueDate?new Date(t.dueDate):null;
+    return `<div class="tile-item" data-id="${t.id}">
+      <div class="tile-check" data-action="toggle">${t.done?"✓":""}</div>
+      <span>${esc(t.text)}</span>
+      <span class="tile-meta">${d?`${d.getMonth()+1}/${d.getDate()}`:""}${t.alarmEnabled?" ⏰":""}</span>
     </div>`;
   }).join("");
 }
 
 // ================================
-// Events
+// 事件
 // ================================
 $("todoInput").addEventListener("keydown", async e => {
-  if (e.key === "Enter") {
-    const text = $("todoInput").value.trim();
-    if (!text) return;
-    todos.unshift({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-      text, done: false, createdAt: new Date().toISOString(),
-      dueDate: null, alarmEnabled: false, alarmTime: null
-    });
-    $("todoInput").value = "";
-    await saveData();
-    render();
-  }
+  if(e.key !== "Enter") return;
+  const text = $("todoInput").value.trim();
+  if(!text) return;
+  const todo = { id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), text, done:false, createdAt:new Date().toISOString(), dueDate:null, alarmEnabled:false, alarmTime:null };
+  todos.unshift(todo);
+  $("todoInput").value = "";
+  if(isElectron) await api.todos.create(text);
+  else await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(todos)});
+  render();
 });
 
 $("todoList").addEventListener("click", async e => {
-  const item = e.target.closest(".item");
-  if (!item) return;
+  const item = e.target.closest(".item"); if(!item) return;
   const id = item.dataset.id;
   const act = e.target.closest("[data-action]")?.dataset?.action;
-
-  if (act === "toggle") {
-    const t = todos.find(x => x.id === id);
-    if (t) { t.done = !t.done; await saveData(); render(); }
-  } else if (act === "delete") {
-    todos = todos.filter(x => x.id !== id);
-    await saveData(); render();
-  } else if (act === "alarm") {
-    openAlarm(id);
-  } else if (act === "edit") {
-    startEdit(id);
-  }
+  const t = todos.find(x=>x.id===id); if(!t) return;
+  if(act==="toggle") { t.done=!t.done; if(isElectron) await api.todos.toggle(id); else await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(todos)}); render(); }
+  else if(act==="delete") { todos=todos.filter(x=>x.id!==id); if(isElectron) await api.todos.delete(id); else await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(todos)}); render(); }
+  else if(act==="alarm") openAlarm(id);
+  else if(act==="edit") startEdit(id);
 });
 
-$("todoList").addEventListener("dblclick", e => {
-  const item = e.target.closest(".item");
-  if (item) startEdit(item.dataset.id);
-});
+$("todoList").addEventListener("dblclick", e => { const i=e.target.closest(".item"); if(i) startEdit(i.dataset.id); });
 
 $("tileList").addEventListener("click", async e => {
-  const item = e.target.closest(".tile-item");
-  if (!item) return;
-  const act = e.target.closest("[data-action]");
-  if (act) {
-    const id = item.dataset.id;
-    const t = todos.find(x => x.id === id);
-    if (t) { t.done = !t.done; await saveData(); render(); }
-  }
+  const item = e.target.closest(".tile-item"); if(!item) return;
+  if(!e.target.closest("[data-action]")) return;
+  const t = todos.find(x=>x.id===item.dataset.id); if(!t) return;
+  t.done=!t.done; if(isElectron) await api.todos.toggle(t.id); else await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(todos)}); render();
 });
 
 function startEdit(id) {
-  if (editingId) return;
-  const t = todos.find(x => x.id === id);
-  if (!t) return;
+  if(editingId) return;
+  const t = todos.find(x=>x.id===id); if(!t) return;
   editingId = id;
-  const item = document.querySelector(`.item[data-id="${id}"]`);
-  if (!item) return;
+  const item = document.querySelector(`.item[data-id="${id}"]`); if(!item) return;
   const textEl = item.querySelector(".text");
-  const inp = document.createElement("input");
-  inp.className = "edit-input"; inp.value = t.text;
+  const inp = document.createElement("input"); inp.className="edit-input"; inp.value=t.text;
   textEl.replaceWith(inp); inp.focus(); inp.select();
-
-  async function finish() {
-    const v = inp.value.trim();
-    if (v && v !== t.text) { t.text = v; await saveData(); }
-    render();
-    editingId = null;
-  }
-  inp.addEventListener("blur", finish);
-  inp.addEventListener("keydown", e => {
-    if (e.key === "Enter") inp.blur();
-    if (e.key === "Escape") { render(); editingId = null; }
-  });
+  const fin = async () => { const v=inp.value.trim(); if(v&&v!==t.text){t.text=v;if(isElectron)await api.todos.update(id,{text:v});else await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(todos)})} render(); editingId=null; };
+  inp.addEventListener("blur",fin);
+  inp.addEventListener("keydown", e => { if(e.key==="Enter") inp.blur(); if(e.key==="Escape") { render(); editingId=null; } });
 }
 
-// Search & filter
 $("searchInput").addEventListener("input", render);
-$("filterSelect").addEventListener("change", () => { currentFilter = $("filterSelect").value; render(); });
+$("filterSelect").addEventListener("change", () => { currentFilter=$("filterSelect").value; render(); });
 
 // ================================
-// Alarm panel
+// 闹钟面板
 // ================================
 function openAlarm(id) {
-  alarmTargetId = id;
-  const t = todos.find(x => x.id === id);
-  if (!t) return;
-  const now = new Date();
-  $("alarmDate").value = t.alarmTime ? new Date(t.alarmTime).toISOString().slice(0,10) : now.toISOString().slice(0,10);
-  $("alarmTime").value = t.alarmTime ? `${String(new Date(t.alarmTime).getHours()).padStart(2,"0")}:${String(new Date(t.alarmTime).getMinutes()).padStart(2,"0")}` : "09:00";
-  $("alarmEnabled").checked = t.alarmEnabled !== false;
+  alarmTargetId=id; const t=todos.find(x=>x.id===id); if(!t)return;
+  const now=new Date();
+  $("alarmDate").value=t.alarmTime?new Date(t.alarmTime).toISOString().slice(0,10):now.toISOString().slice(0,10);
+  $("alarmTime").value=t.alarmTime?`${String(new Date(t.alarmTime).getHours()).padStart(2,"0")}:${String(new Date(t.alarmTime).getMinutes()).padStart(2,"0")}`:"09:00";
+  $("alarmEnabled").checked=t.alarmEnabled!==false;
   $("alarmOverlay").classList.remove("hidden");
 }
-
 $("btnAlarmSave").addEventListener("click", async () => {
-  if (!alarmTargetId) return;
-  const t = todos.find(x => x.id === alarmTargetId);
-  if (!t) return;
-  const date = $("alarmDate").value;
-  const time = $("alarmTime").value;
-  t.dueDate = date ? new Date(`${date}T23:59:59`).toISOString() : null;
-  t.alarmTime = date && time ? new Date(`${date}T${time}:00`).toISOString() : null;
-  t.alarmEnabled = $("alarmEnabled").checked;
-  await saveData(); render();
-  $("alarmOverlay").classList.add("hidden");
-  alarmTargetId = null;
+  if(!alarmTargetId)return; const t=todos.find(x=>x.id===alarmTargetId); if(!t)return;
+  const d=$("alarmDate").value, tm=$("alarmTime").value;
+  t.dueDate=d?new Date(d+"T23:59:59").toISOString():null;
+  t.alarmTime=d&&tm?new Date(d+"T"+tm+":00").toISOString():null;
+  t.alarmEnabled=$("alarmEnabled").checked;
+  if(isElectron) await api.todos.update(t.id,{dueDate:t.dueDate,alarmTime:t.alarmTime,alarmEnabled:t.alarmEnabled});
+  else await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(todos)});
+  render(); $("alarmOverlay").classList.add("hidden"); alarmTargetId=null;
 });
-
-$("btnAlarmCancel").addEventListener("click", () => {
-  $("alarmOverlay").classList.add("hidden");
-  alarmTargetId = null;
-});
+$("btnAlarmCancel").addEventListener("click",()=>{$("alarmOverlay").classList.add("hidden");alarmTargetId=null;});
 
 // ================================
-// Settings
+// 设置
 // ================================
 $("btnSettings").addEventListener("click", async () => {
-  try {
-    const r = await fetch("/config");
-    const cfg = await r.json();
-    $("settingOpacity").value = cfg.opacity || 0.92;
-    $("opacityValue").textContent = cfg.opacity || 0.92;
-    $("settingAlarmSound").checked = cfg.alarmSound !== false;
-  } catch {}
+  try { const c=await getConfig(); $("settingOpacity").value=c.opacity||0.92; $("opacityValue").textContent=c.opacity||0.92; $("settingAlarmSound").checked=c.alarmSound!==false; } catch {}
   $("settingsOverlay").classList.remove("hidden");
 });
-
 $("btnCloseSettings").addEventListener("click", async () => {
-  await fetch("/config", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      opacity: parseFloat($("settingOpacity").value),
-      alarmSound: $("settingAlarmSound").checked,
-      alwaysOnTop: true,
-    })
-  });
-  // Apply tile opacity
-  document.getElementById("tileView").style.opacity = $("settingOpacity").value;
+  await saveCfg({opacity:parseFloat($("settingOpacity").value),alarmSound:$("settingAlarmSound").checked});
   $("settingsOverlay").classList.add("hidden");
 });
+$("settingOpacity").addEventListener("input",()=>{$("opacityValue").textContent=$("settingOpacity").value});
 
-$("settingOpacity").addEventListener("input", () => {
-  $("opacityValue").textContent = $("settingOpacity").value;
-});
-
-// View switching
+// Tile toggle
 $("btnTile").addEventListener("click", () => {
-  $("mainView").classList.remove("active");
-  $("tileView").classList.add("active");
-  document.body.classList.add("tile-mode");
-  renderTile();
+  if(isElectron) api.tile.toggle();
 });
 
-$("btnBackToMain").addEventListener("click", () => {
-  $("tileView").classList.remove("active");
-  $("mainView").classList.add("active");
-  document.body.classList.remove("tile-mode");
-});
-
-$("btnRefreshTile").addEventListener("click", renderTile);
-
-// Keyboard shortcuts
+// ================================
+// 快捷键
+// ================================
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") {
-    document.querySelectorAll(".overlay:not(.hidden)").forEach(el => el.classList.add("hidden"));
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-    e.preventDefault();
-    $("todoInput").focus();
-  }
-  // Alt+T toggle tile mode
-  if (e.altKey && e.key === "t") {
-    e.preventDefault();
-    $("btnTile").click();
-  }
-  // Alt+M back to main
-  if (e.altKey && e.key === "m") {
-    e.preventDefault();
-    $("btnBackToMain").click();
-  }
+  if(e.key==="Escape") document.querySelectorAll(".overlay:not(.hidden)").forEach(el=>el.classList.add("hidden"));
+  if((e.ctrlKey||e.metaKey)&&e.key==="n"){e.preventDefault();$("todoInput").focus();}
 });
 
+// Close on backdrop
+document.querySelectorAll(".overlay").forEach(el=>{el.addEventListener("click",e=>{if(e.target===el)el.classList.add("hidden")})});
+
 // ================================
-// Alarm Engine (browser notifications)
+// 初始化 & 闹钟
 // ================================
-async function startAlarmEngine() {
-  if (Notification.permission === "default") {
-    await Notification.requestPermission();
+async function init() {
+  // 判断是否为 tile 模式 (Electron tile window 通过 hash 判断)
+  if (location.hash === "#/tile") {
+    document.body.classList.add("tile-mode");
+    $("mainArea").style.display = "none";
+    $("tileArea").style.display = "flex";
+    $("tileArea").style.flexDirection = "column";
   }
-  if (alarmInterval) clearInterval(alarmInterval);
-  const notified = new Set();
 
-  alarmInterval = setInterval(() => {
-    const now = Date.now();
-    todos.forEach(t => {
-      if (t.done || !t.alarmEnabled || !t.alarmTime) return;
-      const ms = new Date(t.alarmTime).getTime();
-      if (Math.abs(now - ms) < 30000 && !notified.has(t.id)) {
-        notified.add(t.id);
-        try {
-          const n = new Notification("⏰ 待办提醒", { body: t.text });
-          n.onclick = () => { window.focus(); };
-        } catch {}
-      }
-    });
-  }, 10000);
+  await loadData();
 
-  // Request notification permission on load
-  if (Notification.permission === "default") {
-    Notification.requestPermission();
+  // 闹钟引擎（仅 Electron 后端管理，浏览器模式用前端 Notification）
+  if (!isElectron && Notification.permission === "default") await Notification.requestPermission();
+  if (!isElectron) {
+    const notified = new Set();
+    setInterval(() => {
+      const now = Date.now();
+      todos.forEach(t => {
+        if(t.done||!t.alarmEnabled||!t.alarmTime) return;
+        const ms = new Date(t.alarmTime).getTime();
+        if(Math.abs(now-ms)<30000 && !notified.has(t.id)) {
+          notified.add(t.id);
+          try { new Notification("⏰ 待办提醒",{body:t.text}); } catch {}
+        }
+      });
+    }, 10000);
+  }
+
+  // Electron 数据同步事件
+  if (isElectron) {
+    api.onTodosChanged(newTodos => { todos = newTodos; render(); });
   }
 }
 
-// ================================
-// Init
-// ================================
-// Close overlays on backdrop click
-document.querySelectorAll(".overlay").forEach(el => {
-  el.addEventListener("click", e => { if (e.target === el) el.classList.add("hidden"); });
-});
-
-loadData();
-startAlarmEngine();
+init();
 </script>
 </body>
 </html>

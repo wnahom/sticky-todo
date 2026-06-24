@@ -1,9 +1,14 @@
 ﻿{
   "name": "sticky-todo",
   "version": "1.0.0",
-  "description": "桌面磁贴待办清单 - 纯 Node.js 零依赖",
+  "description": "桌面磁贴待办清单 - 支持闹钟提醒和全局快捷键",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "electron .",
+    "dev": "electron . --dev"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^42.5.0"
+  }
 }

@@ -142,6 +142,12 @@ function setupIPC() {
       tileWin.setSize(w, h);
     }
   });
+  ipcMain.handle("autostart:get", () => {
+    try { return app.getLoginItemSettings().openAtLogin; } catch { return false; }
+  });
+  ipcMain.handle("autostart:set", (_, enable) => {
+    try { app.setLoginItemSettings({ openAtLogin: enable }); return true; } catch { return false; }
+  });
 }
 
 function notify() {

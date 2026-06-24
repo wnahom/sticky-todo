@@ -68,8 +68,11 @@ header .btn.close:hover{background:#fde8e8}
 
 /* Tile window styles */
 body.tile-mode{background:rgba(255,248,240,.92)}
-.tile-header{display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(196,154,108,.15);font-size:10px;color:var(--faint);-webkit-app-region:drag;cursor:grab;letter-spacing:.5px;user-select:none}
-.tile-header .pin{display:inline-block;width:8px;height:8px;border:1.5px solid var(--accent);border-radius:50%;margin-right:5px;background:var(--accent);opacity:.6}
+.tile-header{display:flex;align-items:center;gap:4px;padding:4px 6px;border-bottom:1px solid rgba(196,154,108,.12);-webkit-app-region:drag;cursor:grab;user-select:none}
+.tile-title{font-size:10px;color:var(--faint);letter-spacing:.5px}
+.tile-pinbtn{width:22px;height:22px;border:none;border-radius:3px;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-right:auto;transition:.12s;color:var(--accent);opacity:.4;-webkit-app-region:no-drag}
+.tile-pinbtn:hover{opacity:1;background:rgba(196,154,108,.1)}
+.tile-pinbtn.active{opacity:.8}
 .tile-list{flex:1;overflow-y:auto;padding:2px 6px}
 .tile-input{display:flex;gap:3px;padding:3px 6px;border-bottom:1px solid rgba(196,154,108,.12);-webkit-app-region:no-drag}
 .tile-input input{flex:1;padding:3px 6px;border:none;border-bottom:1px solid rgba(196,154,108,.2);border-radius:0;font-size:11px;font-family:inherit;outline:none;background:transparent;color:var(--text)}
@@ -154,7 +157,8 @@ body.tile-mode .hide-in-tile{display:none!important}
 <!-- 磁贴区域 -->
 <div id="tileArea" style="display:none">
   <div class="tile-header">
-    <span class="pin"></span> STICKY
+    <button class="tile-pinbtn" id="tilePinBtn" title="切换置顶"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor" stroke="none"><path d="M10 1a1 1 0 0 1 .7.3l4 4a1 1 0 0 1-1.4 1.4L11 4.4V9l3 3v2H6v-2l3-3V4.4L6.7 6.7a1 1 0 1 1-1.4-1.4l4-4A1 1 0 0 1 10 1zM5 14h10v2H5v-2z"/></svg></button>
+    <span class="tile-title">Sticky</span>
   </div>
   <div class="tile-input">
     <input type="text" id="tileInput" placeholder="添加待办..." />
@@ -239,10 +243,10 @@ function render() {
           <div class="check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
           <div class="content">
             <div class="text" data-action="edit">${esc(t.text)}</div>
-            <div class="meta">${t.dueDate?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.dueDate)}</span>`:""}${t.alarmEnabled&&t.alarmTime?`<span>⏰ ${fmt(t.alarmTime)}</span>`:""}</div>
+            <div class="meta">${t.alarmEnabled&&t.alarmTime?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.alarmTime)}</span>`:t.dueDate?`<span class="due ${due&&!t.done?"over":""}">${fmt(t.dueDate)}</span>`:""}</div>
           </div>
           <div class="actions">
-            <button data-action="alarm" title="提醒"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3L2 6m20 0l-3-3"/></svg></button>
+            <button data-action="alarm" title="提醒"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="11" r="6"/><path d="M10 8v3l2 1.5"/></svg></button>
             <button class="del" data-action="delete" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>
         </div>`;
@@ -265,7 +269,7 @@ function renderTile() {
     return `<div class="tile-item ${t.done?"done":""} ${dueTile&&!t.done?"overdue":""}" data-id="${t.id}">
       <div class="tile-check" data-action="toggle">${t.done?"✓":""}</div>
       <span class="tile-text">${esc(t.text)}</span>
-      ${showMeta?`<span class="tile-meta ${dueTile&&!t.done?"over":""}">${d?`${d.getMonth()+1}/${d.getDate()}`:""}${t.alarmEnabled?(d?" ":"")+"~"+timeStr:""}</span>`:""}
+      ${showMeta?`<span class="tile-meta ${dueTile&&!t.done?"over":""}">${t.alarmEnabled&&t.alarmTime?timeStr:d?`${d.getMonth()+1}/${d.getDate()}`:""}</span>`:""}
     </div>`;
   }).join("");
 }
@@ -299,6 +303,14 @@ $("todoList").addEventListener("click", async e => {
 $("todoList").addEventListener("dblclick", e => { const i=e.target.closest(".item"); if(i) startEdit(i.dataset.id); });
 
 // Tile input: Enter to add
+// Tile pin toggle
+$("tilePinBtn").addEventListener("click", async () => {
+  if(isElectron) {
+    const pinned = await api.tile.pin();
+    $("tilePinBtn").classList.toggle("active", pinned);
+  }
+});
+
 // Tile quick add
 $("tileInput").addEventListener("keydown", async e => {
   if(e.key !== "Enter") return;
@@ -401,6 +413,7 @@ async function init() {
     $("mainArea").style.display = "none";
     $("tileArea").style.display = "flex";
     $("tileArea").style.flexDirection = "column";
+    if(isElectron) $("tilePinBtn").classList.add("active");
   }
 
   await loadData();

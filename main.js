@@ -129,6 +129,14 @@ function setupIPC() {
   ipcMain.handle("config:save", (_, c) => saveConfig(c));
   ipcMain.handle("tile:close", () => { if (tileWin) { tileWin.close(); tileWin = null; } });
   ipcMain.handle("tile:toggle", () => toggleTile());
+  ipcMain.handle("tile:pin", () => {
+    if (tileWin && !tileWin.isDestroyed()) {
+      const onTop = !tileWin.isAlwaysOnTop();
+      tileWin.setAlwaysOnTop(onTop);
+      return onTop;
+    }
+    return false;
+  });
 }
 
 function notify() {

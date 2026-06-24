@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   config: { get: () => ipcRenderer.invoke("config:get"), save: (c) => ipcRenderer.invoke("config:save", c) },
   tile: { close: () => ipcRenderer.invoke("tile:close"), toggle: () => ipcRenderer.invoke("tile:toggle"), pin: () => ipcRenderer.invoke("tile:pin"), resize: (w,h) => ipcRenderer.invoke("tile:resize", w, h) },
+  onOpenSettings: (cb) => { const h = () => cb(); ipcRenderer.on('open-settings', h); return () => ipcRenderer.removeListener('open-settings', h); },
   onTodosChanged: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on("todos-changed", h); return () => ipcRenderer.removeListener("todos-changed", h); },
   autostart: { get: () => ipcRenderer.invoke("autostart:get"), set: (v) => ipcRenderer.invoke("autostart:set", v) },
 });

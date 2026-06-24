@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, Notification, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, Notification, nativeImage, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -156,6 +156,47 @@ function notify() {
   if (tileWin && !tileWin.isDestroyed()) tileWin.webContents.send("todos-changed", d);
 }
 
+function createMenu() {
+  const template = [
+    {
+      label: '便签待办',
+      submenu: [
+        { label: '设置', accelerator: 'CmdOrCtrl+,', click: () => { if (mainWin && !mainWin.isDestroyed()) { mainWin.show(); mainWin.webContents.send('open-settings'); } } },
+        { type: 'separator' },
+        { role: 'quit', label: '退出' },
+      ],
+    },
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo', label: '撤销' },
+        { role: 'redo', label: '重做' },
+        { type: 'separator' },
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴' },
+        { role: 'selectAll', label: '全选' },
+      ],
+    },
+    {
+      label: '视图',
+      submenu: [
+        { role: 'reload', label: '刷新' },
+        { role: 'toggleDevTools', label: '开发者工具' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: '全屏' },
+      ],
+    },
+    {
+      label: '窗口',
+      submenu: [
+        { role: 'minimize', label: '最小化' },
+        { role: 'close', label: '关闭' },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 // ============================================================
 // 快捷键
 // ============================================================
@@ -172,6 +213,7 @@ app.isQuitting = false;
 app.whenReady().then(() => {
   setupIPC();
   createMain();
+  createMenu();
   createTray();
   regShortcut();
   startAlarm();

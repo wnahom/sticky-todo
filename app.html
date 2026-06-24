@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -68,9 +68,17 @@ header .btn.close:hover{background:#fde8e8}
 
 /* Tile window styles */
 body.tile-mode{background:rgba(255,248,240,.92)}
-.tile-header{display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid rgba(196,154,108,.2);font-size:11px;color:var(--soft);font-weight:600}
-.tile-header .actions{margin-left:auto}
+.tile-header{display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid rgba(196,154,108,.2);font-size:11px;color:var(--soft);font-weight:600;-webkit-app-region:drag;cursor:grab}
+.tile-header .actions{margin-left:auto;-webkit-app-region:no-drag}
 .tile-list{flex:1;overflow-y:auto;padding:4px 6px}
+.tile-input{display:flex;gap:4px;padding:4px 6px;border-bottom:1px solid rgba(196,154,108,.2);-webkit-app-region:no-drag}
+.tile-input input{flex:1;padding:4px 6px;border:1px solid rgba(196,154,108,.3);border-radius:4px;font-size:11px;font-family:inherit;outline:none;background:rgba(255,255,255,.6)}
+.tile-input input:focus{border-color:var(--accent);background:#fff}
+.tile-quick{display:flex;gap:2px;padding:2px 6px 4px;border-bottom:1px solid rgba(196,154,108,.2);-webkit-app-region:no-drag}
+.tile-quick button{padding:2px 6px;border:1px solid rgba(196,154,108,.25);border-radius:4px;font-size:10px;font-family:inherit;background:rgba(255,255,255,.5);cursor:pointer;color:var(--soft);transition:.12s}
+.tile-quick button:hover{background:var(--accent-light);border-color:var(--accent)}
+.tile-item.overdue{background:rgba(231,76,60,.06)}
+.tile-meta.over{color:var(--danger);font-weight:600}
 .tile-item{display:flex;align-items:flex-start;gap:6px;padding:5px 4px;border-bottom:1px solid rgba(0,0,0,.04);cursor:default;font-size:12px;line-height:1.4}
 .tile-item.done{opacity:.4}
 .tile-check{width:13px;height:13px;min-width:13px;border:1.5px solid rgba(196,154,108,.3);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:7px;cursor:pointer;transition:.12s;color:#fff;margin-top:2px}
@@ -149,6 +157,16 @@ body.tile-mode .hide-in-tile{display:none!important}
   </div>
   <div class="tile-header">
     📌 Sticky Todo
+  </div>
+  <div class="tile-input">
+    <input type="text" id="tileInput" placeholder="快速添加待办..." />
+    <button id="tileAddBtn" style="padding:2px 8px;border:1px solid rgba(196,154,108,.3);border-radius:4px;font-size:12px;background:rgba(255,255,255,.6);cursor:pointer">＋</button>
+  </div>
+  <div class="tile-quick">
+    <button data-qm="5">5m ⏰</button>
+    <button data-qm="15">15m ⏰</button>
+    <button data-qm="30">30m ⏰</button>
+    <button data-qm="60">1h ⏰</button>
   </div>
   <div class="tile-list" id="tileList"></div>
 </div>
@@ -245,13 +263,16 @@ function render() {
 function renderTile() {
   const list = $("tileList");
   const active = todos.filter(t=>!t.done);
+  const now = Date.now();
   if(!active.length) { list.innerHTML=`<div class="empty"><div class="icon">📋</div><div class="txt" style="font-size:12px">全部完成 ✓</div></div>`; return; }
   list.innerHTML = active.map(t => {
     const d = t.dueDate?new Date(t.dueDate):null;
-    return `<div class="tile-item" data-id="${t.id}">
+    const dueTile = t.dueDate && new Date(t.dueDate).getTime() < now;
+    const timeStr = t.alarmTime ? " "+fmt(t.alarmTime) : "";
+    return `<div class="tile-item ${t.done?"done":""} ${dueTile&&!t.done?"overdue":""}" data-id="${t.id}">
       <div class="tile-check" data-action="toggle">${t.done?"✓":""}</div>
       <span>${esc(t.text)}</span>
-      <span class="tile-meta">${d?`${d.getMonth()+1}/${d.getDate()}`:""}${t.alarmEnabled?" ⏰":""}</span>
+      <span class="tile-meta ${dueTile&&!t.done?"over":""}">${d?`${d.getMonth()+1}/${d.getDate()}`:""}${t.alarmEnabled?"⏰":""}${t.alarmEnabled?timeStr:""}</span>
     </div>`;
   }).join("");
 }
@@ -283,6 +304,29 @@ $("todoList").addEventListener("click", async e => {
 });
 
 $("todoList").addEventListener("dblclick", e => { const i=e.target.closest(".item"); if(i) startEdit(i.dataset.id); });
+
+// Tile input: Enter to add
+// Tile quick add
+$("tileInput").addEventListener("keydown", async e => {
+  if(e.key !== "Enter") return;
+  await tileAddTodo(null);
+});
+$("tileAddBtn").addEventListener("click", async () => { await tileAddTodo(null); });
+document.querySelectorAll("[data-qm]").forEach(btn => {
+  btn.addEventListener("click", async () => { await tileAddTodo(parseInt(btn.dataset.qm)); });
+});
+async function tileAddTodo(mins) {
+  const text = $("tileInput").value.trim();
+  if(!text) return;
+  const alarmTime = mins ? new Date(Date.now() + mins*60000).toISOString() : null;
+  const dueDate = mins ? new Date(Date.now() + mins*60000).toISOString() : null;
+  const todo = { id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), text, done:false, createdAt:new Date().toISOString(), dueDate, alarmEnabled:!!mins, alarmTime };
+  todos.unshift(todo);
+  $("tileInput").value = "";
+  if(isElectron) await api.todos.create(text);
+  else await fetch("/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(todos)});
+  render();
+}
 
 $("tileList").addEventListener("click", async e => {
   const item = e.target.closest(".tile-item"); if(!item) return;

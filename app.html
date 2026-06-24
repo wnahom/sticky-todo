@@ -173,6 +173,8 @@ body.tile-mode .hide-in-tile{display:none!important}
     <h2>设置</h2>
     <div class="row"><label>磁贴透明度</label><div class="range-group"><input type="range" id="settingOpacity" min="0.3" max="1" step="0.05" value="0.92"><span id="opacityValue">0.92</span></div></div>
     <div class="row"><label>闹钟声音</label><input type="checkbox" id="settingAlarmSound" checked></div>
+    <div class="row"><label>磁贴宽度</label><input type="range" id="settingTW" min="180" max="500" step="10" value="260"><span id="twVal" style="font-size:12px;min-width:30px;color:var(--soft)">260</span></div>
+    <div class="row"><label>磁贴高度</label><input type="range" id="settingTH" min="200" max="800" step="10" value="360"><span id="thVal" style="font-size:12px;min-width:30px;color:var(--soft)">360</span></div>
     <div class="footer"><button class="btn btn-primary" id="btnCloseSettings">关闭</button></div>
   </div>
 </div>
@@ -239,7 +241,7 @@ function render() {
     if(!f.length) { list.innerHTML=`<div class="empty"><div class="txt">${todos.length?"没有匹配的待办":"还没有待办事项"}</div></div>`; }
     else {
       list.innerHTML = f.map(t => {
-        const due = t.dueDate && over(t.dueDate);
+        const due = t.alarmEnabled && t.alarmTime && new Date(t.alarmTime).getTime() < Date.now();
         return `<div class="item ${t.done?"done":""} ${due&&!t.done?"overdue":""}" data-id="${t.id}">
           <div class="check ${t.done?"checked":""}" data-action="toggle">${t.done?"✓":""}</div>
           <div class="content">
@@ -264,7 +266,7 @@ function renderTile() {
   if(!active.length) { list.innerHTML=`<div class="tile-empty">~ 全部完成 ~</div>`; return; }
   list.innerHTML = active.map(t => {
     const d = t.dueDate?new Date(t.dueDate):null;
-    const dueTile = t.dueDate && new Date(t.dueDate).getTime() < now;
+    const dueTile = t.alarmEnabled && t.alarmTime && new Date(t.alarmTime).getTime() < now;
     const timeStr = t.alarmTime ? fmt(t.alarmTime) : "";
     const showMeta = d || t.alarmEnabled;
     return `<div class="tile-item ${t.done?"done":""} ${dueTile&&!t.done?"overdue":""}" data-id="${t.id}">

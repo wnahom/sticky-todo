@@ -20,7 +20,7 @@ function saveTodos(d) { ensureDir(); fs.writeFileSync(TODO_FILE, JSON.stringify(
 function loadConfig() {
   ensureDir();
   try { return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8")); }
-  catch { return { opacity: 0.92, alarmSound: true }; }
+  catch { return { opacity: 0.92, alarmSound: true, tileWidth: 260, tileHeight: 360 }; }
 }
 function saveConfig(c) { ensureDir(); fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2), "utf-8"); }
 
@@ -69,8 +69,8 @@ function createMain() {
 function createTile() {
   const cfg = loadConfig();
   tileWin = new BrowserWindow({
-    width: 260, height: 360, frame: false, transparent: true,
-    alwaysOnTop: true, skipTaskbar: true, resizable: false,
+    width: cfg.tileWidth || 260, height: cfg.tileHeight || 360, frame: false, transparent: true,
+    alwaysOnTop: true, skipTaskbar: true, resizable: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   tileWin.loadFile(path.join(__dirname, "app.html"), { hash: "/tile" });
@@ -136,6 +136,11 @@ function setupIPC() {
       return onTop;
     }
     return false;
+  });
+  ipcMain.handle("tile:resize", (_, w, h) => {
+    if (tileWin && !tileWin.isDestroyed()) {
+      tileWin.setSize(w, h);
+    }
   });
 }
 

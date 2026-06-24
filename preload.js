@@ -8,6 +8,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     toggle: (id) => ipcRenderer.invoke("todos:toggle", id),
   },
   config: { get: () => ipcRenderer.invoke("config:get"), save: (c) => ipcRenderer.invoke("config:save", c) },
-  tile: { close: () => ipcRenderer.invoke("tile:close"), toggle: () => ipcRenderer.invoke("tile:toggle"), pin: () => ipcRenderer.invoke("tile:pin") },
+  tile: { close: () => ipcRenderer.invoke("tile:close"), toggle: () => ipcRenderer.invoke("tile:toggle"), pin: () => ipcRenderer.invoke("tile:pin"), resize: (w,h) => ipcRenderer.invoke("tile:resize", w, h) },
   onTodosChanged: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on("todos-changed", h); return () => ipcRenderer.removeListener("todos-changed", h); },
 });

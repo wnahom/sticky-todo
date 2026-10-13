@@ -1,16 +1,48 @@
 const { contextBridge, ipcRenderer } = require("electron");
-contextBridge.exposeInMainWorld("electronAPI", {
+
+// 窗口角色由主进程通过 loadFile 的 query 传入：main | tile
+const params = new URLSearchParams(window.location.search);
+const mode = params.get("mode") === "tile" ? "tile" : "main";
+
+const on = (channel) => (cb) => {
+  const handler = (_e, payload) => cb(payload);
+  ipcRenderer.on(channel, handler);
+  return () => ipcRenderer.removeListener(channel, handler);
+};
+
+contextBridge.exposeInMainWorld("sticky", {
+  mode,
+
   todos: {
     list: () => ipcRenderer.invoke("todos:list"),
-    create: (t) => ipcRenderer.invoke("todos:create", t),
-    update: (id, u) => ipcRenderer.invoke("todos:update", id, u),
-    delete: (id) => ipcRenderer.invoke("todos:delete", id),
+    create: (text) => ipcRenderer.invoke("todos:create", text),
+    update: (id, patch) => ipcRenderer.invoke("todos:update", id, patch),
     toggle: (id) => ipcRenderer.invoke("todos:toggle", id),
+    remove: (id) => ipcRenderer.invoke("todos:delete", id),
   },
-  config: { get: () => ipcRenderer.invoke("config:get"), save: (c) => ipcRenderer.invoke("config:save", c) },
-  tile: { close: () => ipcRenderer.invoke("tile:close"), toggle: () => ipcRenderer.invoke("tile:toggle"), pin: () => ipcRenderer.invoke("tile:pin"), resize: (w,h) => ipcRenderer.invoke("tile:resize", w, h) },
-  onOpenSettings: (cb) => { const h = () => cb(); ipcRenderer.on('open-settings', h); return () => ipcRenderer.removeListener('open-settings', h); },
-  onTodosChanged: (cb) => { const h = (_, d) => cb(d); ipcRenderer.on("todos-changed", h); return () => ipcRenderer.removeListener("todos-changed", h); },
-  autostart: { get: () => ipcRenderer.invoke("autostart:get"), set: (v) => ipcRenderer.invoke("autostart:set", v) },
-  win: { minimize: () => ipcRenderer.invoke("win:minimize"), maximize: () => ipcRenderer.invoke("win:maximize"), close: () => ipcRenderer.invoke("win:close") },
+
+  config: {
+    get: () => ipcRenderer.invoke("config:get"),
+    save: (patch) => ipcRenderer.invoke("config:save", patch),
+  },
+
+  tile: {
+    show: () => ipcRenderer.invoke("tile:show"),
+    hide: () => ipcRenderer.invoke("tile:hide"),
+    pin: () => ipcRenderer.invoke("tile:pin"),
+  },
+
+  win: {
+    minimize: () => ipcRenderer.invoke("win:minimize"),
+    close: () => ipcRenderer.invoke("win:close"),
+  },
+
+  autostart: {
+    get: () => ipcRenderer.invoke("autostart:get"),
+    set: (v) => ipcRenderer.invoke("autostart:set", v),
+  },
+
+  // 主进程推送：数据/配置变更
+  onTodosChanged: on("todos-changed"),
+  onConfigChanged: on("config-changed"),
 });

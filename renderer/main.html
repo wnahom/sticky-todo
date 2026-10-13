@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>便签待办</title>
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="drag">
+    <span class="title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v7m0 6v7"/>
+      </svg>便签待办
+    </span>
+    <span class="badge" id="countBadge">0/0</span>
+    <div class="actions no-drag">
+      <button class="btn" id="btnTile" title="磁贴">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+        </svg>
+      </button>
+      <button class="btn" id="btnSettings" title="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+      <button class="btn close" id="btnCloseWin" title="隐藏到托盘">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="input-area">
+    <input type="text" id="todoInput" placeholder="输入新待办，按 Enter 添加..." autofocus>
+  </div>
+
+  <div class="list scroll-host" id="todoList"></div>
+</div>
+
+<!-- 设置面板 -->
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="panel">
+    <h2>设置</h2>
+    <div class="row">
+      <label>磁贴透明度</label>
+      <div class="range-group">
+        <input type="range" id="settingOpacity" min="0.3" max="1" step="0.05" value="0.92">
+        <span id="opacityValue">0.92</span>
+      </div>
+    </div>
+    <div class="row"><label>闹钟声音</label><input type="checkbox" id="settingAlarmSound" checked></div>
+    <div class="row"><label>开机自启</label><input type="checkbox" id="settingAutoStart"></div>
+    <div class="row">
+      <label>磁贴宽度</label>
+      <div class="range-group">
+        <input type="range" id="settingTW" min="180" max="500" step="10" value="260">
+        <span id="twVal">260</span>
+      </div>
+    </div>
+    <div class="row">
+      <label>磁贴高度</label>
+      <div class="range-group">
+        <input type="range" id="settingTH" min="200" max="800" step="10" value="360">
+        <span id="thVal">360</span>
+      </div>
+    </div>
+    <p class="hint">磁贴位置与尺寸会自动记住，下次启动恢复到原处。</p>
+    <div class="footer"><button class="btn btn-primary" id="btnCloseSettings">完成</button></div>
+  </div>
+</div>
+
+<!-- 提醒面板 -->
+<div class="overlay hidden" id="alarmOverlay">
+  <div class="panel">
+    <h3>设置提醒</h3>
+    <div class="row"><label>截止日期</label><input type="date" id="alarmDate"></div>
+    <div class="row"><label>提醒时间</label><input type="time" id="alarmTime"></div>
+    <div class="row"><label>启用提醒</label><input type="checkbox" id="alarmEnabled" checked></div>
+    <p class="hint">提醒到点时由系统通知弹出；若届时应用未运行，下次启动会补报一次。</p>
+    <div class="footer">
+      <button class="btn btn-secondary" id="btnAlarmCancel">取消</button>
+      <button class="btn btn-primary" id="btnAlarmClear">清除提醒</button>
+      <button class="btn btn-primary" id="btnAlarmSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>

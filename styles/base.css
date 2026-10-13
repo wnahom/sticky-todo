@@ -1,0 +1,122 @@
+/* ============================================================
+   基础层：设计令牌 + 两端共用的待办条目样式
+   主窗口与磁贴窗口都引入本文件
+   ============================================================ */
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#f5f0eb; --panel:#fff; --hover:#ede8e0;
+  --text:#2c2c2c; --soft:#666; --faint:#999;
+  --border:#e0d8ce; --accent:#c49a6c; --accent-light:#f0e6d8;
+  --accent-dark:#b8895c;
+  --danger:#e74c3c; --success:#27ae60;
+  --shadow:0 2px 12px rgba(0,0,0,.08);
+  --radius:10px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+}
+
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+  height:100vh;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+/* 无边框窗口：整窗可拖拽，交互元素逐个排除 */
+.drag{-webkit-app-region:drag}
+.no-drag{-webkit-app-region:no-drag}
+
+/* ---------- 滚动条 ---------- */
+.scroll-host{overflow-y:auto}
+.scroll-host::-webkit-scrollbar{width:4px}
+.scroll-host::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ---------- 遮罩与面板（仅主窗口使用） ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,.3);
+  backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;
+}
+.overlay.hidden{display:none}
+
+.panel{
+  background:var(--panel);
+  border-radius:12px;
+  padding:24px;
+  width:380px;max-width:90vw;
+  box-shadow:0 8px 32px rgba(0,0,0,.15);
+}
+.panel h2{font-size:18px;margin-bottom:20px}
+.panel h3{font-size:16px;margin-bottom:18px}
+
+.row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.row label{min-width:100px;font-size:13px;color:var(--soft)}
+.row input[type=text],
+.row input[type=date],
+.row input[type=time]{
+  flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;
+  font-size:13px;font-family:inherit;outline:none;background:#fff;color:var(--text);
+}
+.row input:focus{border-color:var(--accent)}
+.row input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+
+.range-group{display:flex;align-items:center;gap:8px;flex:1}
+.range-group span{font-size:13px;min-width:30px;text-align:right;color:var(--soft)}
+
+.hint{font-size:11px;color:var(--faint)}
+
+.footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+
+.btn{
+  padding:8px 20px;border:none;border-radius:8px;
+  font-size:13px;font-family:inherit;cursor:pointer;transition:.15s;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-dark)}
+.btn-secondary{background:var(--hover);color:var(--soft)}
+.btn-secondary:hover{background:var(--border)}
+
+.badge{
+  display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;
+  background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:600;
+}
+
+.empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:48px 20px;color:var(--faint);
+  font-size:13px;
+}
+
+/* ============================================================
+   待办条目 —— 主窗口与磁贴唯一的共用渲染产物
+   两份视图只通过 data-* 与修饰类区分，不再各写一套模板
+   ============================================================ */
+.todo{
+  display:flex;align-items:flex-start;gap:10px;
+  position:relative;
+  border:1px solid transparent;
+  border-radius:var(--radius);
+  transition:.15s;
+}
+
+.todo-check{
+  display:flex;align-items:center;justify-content:center;
+  flex:none;cursor:pointer;color:#fff;transition:.15s;
+  border:2px solid var(--border);border-radius:5px;
+}
+.todo-check:hover{border-color:var(--accent)}
+.todo-check.checked{background:var(--success);border-color:var(--success)}
+
+.todo-body{flex:1;min-width:0}
+.todo-text{word-break:break-word}
+.todo-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--faint)}
+.todo-meta .due{display:inline-flex;align-items:center;gap:2px}
+.todo-meta .due.over{color:var(--danger);font-weight:600}
+
+.todo.done .todo-text{text-decoration:line-through;color:var(--faint)}
+.todo.overdue{border-left:3px solid var(--danger)}

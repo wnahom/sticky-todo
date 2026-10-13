@@ -1,0 +1,73 @@
+/* ============================================================
+   主窗口（便签待办）专属样式
+   ============================================================ */
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* ---------- 顶栏 ---------- */
+header{
+  display:flex;align-items:center;
+  height:44px;padding:0 12px;
+  background:#fff;border-bottom:1px solid var(--border);
+}
+header .title{flex:1;font-size:14px;font-weight:600}
+header .title svg{margin-right:6px;vertical-align:-3px}
+
+header .actions{display:flex;gap:4px}
+header .btn{
+  width:32px;height:32px;padding:0;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);border-radius:6px;
+  font-size:16px;color:#555;background:#f8f8f8;
+  cursor:pointer;transition:.12s;
+}
+header .btn:hover{background:#eee;border-color:var(--accent)}
+header .btn svg{width:16px;height:16px;flex:none;display:block;pointer-events:none}
+header .btn.close:hover{background:#fde8e8}
+
+/* ---------- 新增输入 ---------- */
+.input-area{padding:4px 12px 8px}
+.input-area input{
+  width:100%;padding:10px 14px;
+  border:2px dashed var(--border);border-radius:var(--radius);
+  font-size:14px;font-family:inherit;background:var(--panel);
+  outline:none;transition:.15s;
+}
+.input-area input:focus{border-color:var(--accent);border-style:solid}
+.input-area input::placeholder{color:var(--faint)}
+
+/* ---------- 列表 ---------- */
+.list{flex:1;padding:4px 10px 10px}
+
+.todo{
+  padding:10px 12px;
+  margin-bottom:4px;
+  background:var(--panel);
+  font-size:14px;
+  cursor:default;
+}
+.todo:hover{border-color:var(--border);box-shadow:var(--shadow)}
+.todo.done{opacity:.55}
+
+.todo-check{width:20px;height:20px;min-width:20px;margin-top:2px;font-size:12px}
+
+.todo-text{font-size:14px;line-height:1.5;cursor:text}
+.todo-meta{margin-top:4px;font-size:11px}
+
+/* 编辑态：用输入框替换文本节点 */
+.edit-input{
+  width:100%;padding:4px 8px;
+  border:2px solid var(--accent);border-radius:5px;
+  font-size:14px;font-family:inherit;background:#fff;outline:none;
+}
+
+/* 行内操作按钮：悬停才出现 */
+.todo-actions{display:flex;gap:2px;opacity:0;transition:.15s}
+.todo:hover .todo-actions{opacity:1}
+.todo-actions button{
+  width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;border-radius:5px;
+  font-size:14px;cursor:pointer;transition:.15s;
+}
+.todo-actions button:hover{background:var(--hover)}
+.todo-actions button.del:hover{background:#fde8e8}

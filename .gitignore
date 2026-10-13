@@ -1,6 +1,4 @@
-﻿node_modules/
-data.json
-config.json
+node_modules/
 .DS_Store
 Thumbs.db
 *.swp
@@ -8,3 +6,21 @@ Thumbs.db
 .vscode/
 
 nul
+
+# 构建产物（由 scripts/deploy.ps1 生成并部署，不入库）
+dist/
+release/
+
+# 数据落在用户目录，这里只是兜底
+data.json
+config.json
+todos.json
+alarms-fired.json
+*.corrupt-*
+
+# 自检临时输出
+.smoke-*.log
+.smoke-*.log.err
+
+# ����/�Լ���־
+.prod.log*

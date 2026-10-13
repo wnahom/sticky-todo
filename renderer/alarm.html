@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>提醒</title>
+<link rel="stylesheet" href="../styles/base.css">
+<style>
+  body{background:transparent;overflow:hidden}
+  .alarm{
+    display:flex;flex-direction:column;height:100vh;
+    padding:12px 14px;
+    background:#fffdf8;
+    border:1px solid var(--border);
+    border-left:4px solid var(--accent);
+    border-radius:10px;
+    box-shadow:0 8px 28px rgba(0,0,0,.18);
+    -webkit-app-region:drag;
+  }
+  .alarm-head{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent)}
+  .alarm-head .more{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+  .alarm-text{
+    flex:1;margin:8px 0;overflow-y:auto;
+    font-size:14px;line-height:1.45;color:var(--text);
+    word-break:break-word;-webkit-app-region:no-drag;user-select:text;
+  }
+  .alarm-time{font-size:11px;color:var(--faint);margin-bottom:8px}
+  .alarm-actions{display:flex;gap:6px;-webkit-app-region:no-drag}
+  .alarm-actions .btn{padding:5px 12px;font-size:12px;border-radius:6px}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--soft)}
+  .btn-ghost:hover{background:var(--hover)}
+  .alarm-empty{padding:20px;text-align:center;font-size:12px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="alarm">
+  <div class="alarm-head">
+    <span>⏰ 待办提醒</span>
+    <span class="more" id="moreLabel"></span>
+  </div>
+  <div class="alarm-time" id="alarmTime"></div>
+  <div class="alarm-text" id="alarmText">—</div>
+  <div class="alarm-actions">
+    <button class="btn btn-ghost" id="btnSnooze" title="10 分钟后再提醒">推迟 10 分钟</button>
+    <button class="btn btn-ghost" id="btnDone">标记完成</button>
+    <button class="btn btn-primary" id="btnDismiss">知道了</button>
+  </div>
+</div>
+<script type="module" src="./alarm.js"></script>
+</body>
+</html>

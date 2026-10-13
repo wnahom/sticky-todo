@@ -169,6 +169,7 @@ $("btnSettings").addEventListener("click", async () => {
     $("settingOpacity").value = c.opacity ?? 0.92;
     $("opacityValue").textContent = c.opacity ?? 0.92;
     $("settingAlarmSound").checked = c.alarmSound !== false;
+    $("settingSysNotify").checked = c.systemNotification !== false;
     // 尺寸以磁贴实际 bounds 为准：拖动过之后配置里的 tileWidth/Height
     // 与滑块显示必须一致，否则面板会显示一个窗口并不使用的数字
     const b = await api.tile.bounds();
@@ -185,6 +186,7 @@ $("btnCloseSettings").addEventListener("click", async () => {
   await store.saveConfig({
     opacity: parseFloat($("settingOpacity").value),
     alarmSound: $("settingAlarmSound").checked,
+    systemNotification: $("settingSysNotify").checked,
   });
   // 尺寸走专用通道：它会同时更新 tileWidth/Height 并清掉旧的 tileBounds，
   // 否则 createTile() 里 tileBounds 优先，滑块改了也不生效
@@ -232,6 +234,13 @@ api.onConfigChanged((c) => { Object.assign(store.config, c); });
 api.onFocusInput(() => {
   const el = $("todoInput");
   if (el) { el.focus(); el.select(); }
+});
+// 提醒到点：把主窗口带到前台，方便直接处理
+api.onAlarms((list) => {
+  if (list && list.length) {
+    // 不强制抢焦点，只在窗口已打开时刷新列表（数据变更会经 todos-changed 推送）
+    console.log("[sticky] 有新的提醒:", list.map((t) => t.text).join(" / "));
+  }
 });
 // 拖动/缩放磁贴时同步设置面板的尺寸滑块
 api.onTileBoundsChanged((b) => {

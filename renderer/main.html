@@ -62,7 +62,8 @@
         <span id="opacityValue">0.92</span>
       </div>
     </div>
-    <div class="row"><label>闹钟声音</label><input type="checkbox" id="settingAlarmSound" checked></div>
+    <div class="row"><label>提醒声音</label><input type="checkbox" id="settingAlarmSound" checked></div>
+    <div class="row"><label>系统通知</label><input type="checkbox" id="settingSysNotify" checked></div>
     <div class="row"><label>开机自启</label><input type="checkbox" id="settingAutoStart"></div>
     <div class="row">
       <label>磁贴宽度</label>
@@ -90,7 +91,8 @@
     <div class="row"><label>截止日期</label><input type="date" id="alarmDate"></div>
     <div class="row"><label>提醒时间</label><input type="time" id="alarmTime"></div>
     <div class="row"><label>启用提醒</label><input type="checkbox" id="alarmEnabled" checked></div>
-    <p class="hint">提醒到点时由系统通知弹出；若届时应用未运行，下次启动会补报一次。</p>
+    <p class="hint">提醒到点时会弹出应用内提醒窗口（右下角，置顶）。<br>
+      系统通知仅在 Windows 通知未被关闭时显示，可在此开关。</p>
     <div class="footer">
       <button class="btn btn-secondary" id="btnAlarmCancel">取消</button>
       <button class="btn btn-primary" id="btnAlarmClear">清除提醒</button>

@@ -44,9 +44,32 @@ scripts/
 - 待办增删改查、勾选完成、行内编辑
 - 筛选：全部 / 未完成 / 已完成 / 有提醒
 - 磁贴模式（透明置顶小窗，位置、尺寸、置顶状态自动记住，`Esc` 关闭）
-- 提醒：到点弹系统通知，点击通知拉起主窗口
+- 提醒：到点弹出**应用内提醒窗口**（右下角置顶），可直接「推迟 10 分钟 / 标记完成 / 知道了」
 - 托盘：悬停显示未完成与逾期数量，菜单可「新建待办」直接聚焦输入框
-- 设置：磁贴透明度 / 磁贴尺寸 / 提醒声音 / 开机自启
+- 设置：磁贴透明度 / 磁贴尺寸 / 提醒声音 / 系统通知 / 开机自启
+
+### 关于提醒的实现
+
+提醒**不依赖系统通知**。原因是 Windows 的 toast 可能在系统层面被关闭：
+
+```
+HKCU\Software\Microsoft\Windows\CurrentVersion\PushNotifications\ToastEnabled = 0
+```
+
+此时 `Notification.show()` 会静默失败，只留下一条日志：
+
+```
+Notification failed - Settings prevent the notification type from being delivered. (HRESULT: -2143420140)
+```
+
+用户完全看不到提醒，且应用无法感知。因此到点一律弹出应用内提醒窗口，系统通知仅作为可选的额外通道
+（设置面板可关，关掉后就不再产生上面的失败日志）。
+
+若希望恢复系统通知，把 `ToastEnabled` 置为 1 并重启资源管理器：
+
+```powershell
+Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications" ToastEnabled 1
+```
 
 ## 快捷键
 

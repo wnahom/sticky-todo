@@ -31,6 +31,7 @@ const BACKUP_KEEP = 3;
 const DEFAULT_CONFIG = {
   opacity: 0.92,
   alarmSound: true,
+  systemNotification: true, // 关掉可避免每次提醒都产生一条失败日志
   tileWidth: 260,
   tileHeight: 360,
   tileBounds: null,
@@ -207,21 +208,41 @@ function createMain() {
   mainWin.on("closed", () => { mainWin = null; });
 }
 
-/** 校验记忆的磁贴位置是否仍落在当前某块屏幕内，否则回退居中 */
+/**
+ * 校正记忆的磁贴位置。
+ * 原实现只要求与工作区有 20px 交叠，于是「大部分在屏幕外」的坐标也会被
+ * 原样使用 —— 尤其把磁贴拖到副屏外侧、之后拔掉副屏时，窗口会跑到看不见的地方。
+ * 现在改为：仍有交叠就夹回可见区域（保留用户想放哪块屏的意图），
+ * 完全不沾边才回退居中。
+ */
 function usableBounds(saved) {
   if (!saved || !Number.isFinite(saved.x) || !Number.isFinite(saved.y)) return null;
-  const w = Math.min(Math.max(saved.width || 260, 180), 2000);
-  const h = Math.min(Math.max(saved.height || 360, 150), 2000);
-  for (const d of screen.getAllDisplays()) {
+  const w = Math.min(Math.max(Math.round(saved.width) || 260, 180), 2000);
+  const h = Math.min(Math.max(Math.round(saved.height) || 360, 150), 2000);
+  const displays = screen.getAllDisplays();
+
+  let best = null;
+  let bestOverlap = 0;
+  for (const d of displays) {
     const wa = d.workArea;
-    if (
-      saved.x + w > wa.x + 20 && saved.x < wa.x + wa.width - 20 &&
-      saved.y + h > wa.y + 20 && saved.y < wa.y + wa.height - 20
-    ) {
-      return { x: Math.round(saved.x), y: Math.round(saved.y), width: w, height: h };
+    // 与工作区的交叠面积
+    const ox = Math.max(0, Math.min(saved.x + w, wa.x + wa.width) - Math.max(saved.x, wa.x));
+    const oy = Math.max(0, Math.min(saved.y + h, wa.y + wa.height) - Math.max(saved.y, wa.y));
+    const overlap = ox * oy;
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      best = wa;
     }
   }
-  return null; // 原屏幕已拔掉/分辨率变了 → 用默认位置
+  if (!best) return null; // 完全不在任何屏幕内 → 回退到默认位置
+
+  // 尺寸不能超过这块屏的工作区，否则再怎么夹也会有一部分在屏外
+  const fitW = Math.min(w, best.width);
+  const fitH = Math.min(h, best.height);
+  // 夹进工作区，保证整个窗口可见
+  const x = Math.round(Math.min(Math.max(saved.x, best.x), best.x + best.width - fitW));
+  const y = Math.round(Math.min(Math.max(saved.y, best.y), best.y + best.height - fitH));
+  return { x, y, width: fitW, height: fitH };
 }
 
 function rememberTileBounds() {
@@ -360,7 +381,10 @@ function focusQuickAdd() {
 // 闹钟调度
 // ============================================================
 let alarmTimer = null;
+let alarmWin = null;
 const fired = loadFired();
+/** 当前弹出中的提醒（供应用内提醒窗口显示） */
+let pendingAlarms = [];
 
 /**
  * 已触发标记不是用户数据，写入失败只可能造成重复提醒，
@@ -377,8 +401,10 @@ function safeSaveFired() {
 function fireAlarm(t) {
   fired[t.id] = Date.now();
   safeSaveFired();
+  showAlarmWindow(t);
+  if (cfg().systemNotification === false) return;
   if (!Notification.isSupported()) {
-    console.warn("[sticky] 系统通知不可用，闹钟仅在应用内提示");
+    console.warn("[sticky] 系统通知不可用，已改用应用内提醒窗口");
     return;
   }
   try {
@@ -398,6 +424,80 @@ function fireAlarm(t) {
     n.show();
   } catch (e) {
     console.error("[sticky] 通知异常:", e.message);
+  }
+}
+
+// ============================================================
+// 应用内提醒窗口
+// ------------------------------------------------------------
+// 不能只依赖系统通知：HKCU\...\PushNotifications\ToastEnabled
+// 为 0 时 Notification.show() 会静默失败，用户完全看不到提醒。
+// ============================================================
+function pushPending(t) {
+  pendingAlarms = pendingAlarms.filter((x) => x.id !== t.id);
+  pendingAlarms.unshift(t);
+  for (const w of [alarmWin, mainWin]) {
+    if (w && !w.isDestroyed()) w.webContents.send("alarms", pendingAlarms);
+  }
+}
+
+function closeAlarmWindow() {
+  if (alarmWin && !alarmWin.isDestroyed()) alarmWin.close();
+  alarmWin = null;
+}
+
+function showAlarmWindow(t) {
+  pushPending(t);
+  if (alarmWin && !alarmWin.isDestroyed()) {
+    alarmWin.show();
+    alarmWin.focus();
+    return;
+  }
+  const W = 340;
+  const H = 176;
+  let x, y;
+  try {
+    const wa = screen.getPrimaryDisplay().workArea;
+    x = Math.round(wa.x + wa.width - W - 20);
+    y = Math.round(wa.y + wa.height - H - 20);
+  } catch { /* 取不到屏幕信息就让系统定位 */ }
+
+  alarmWin = new BrowserWindow({
+    width: W,
+    height: H,
+    ...(x !== undefined ? { x, y } : {}),
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  // 提到最高层级，避免被其他置顶窗口盖住
+  alarmWin.setAlwaysOnTop(true, "screen-saver");
+  alarmWin.loadFile(path.join(__dirname, "renderer", "alarm.html"), { query: { mode: "alarm" } });
+  alarmWin.once("ready-to-show", () => {
+    if (!alarmWin || alarmWin.isDestroyed()) return;
+    alarmWin.show();
+    alarmWin.focus();
+  });
+  alarmWin.on("closed", () => { alarmWin = null; });
+}
+
+/** 从待办队列里移除某条提醒并广播；队列空了就关窗 */
+function resolveAlarm(id) {
+  pendingAlarms = pendingAlarms.filter((x) => x.id !== id);
+  if (!pendingAlarms.length) closeAlarmWindow();
+  else {
+    for (const w of [alarmWin, mainWin]) {
+      if (w && !w.isDestroyed()) w.webContents.send("alarms", pendingAlarms);
+    }
   }
 }
 
@@ -499,6 +599,42 @@ function setupIPC() {
     const c = saveConfig(patch || {});
     broadcastConfig(c);
     return c;
+  });
+
+  // ---------- 应用内提醒窗口 ----------
+  ipcMain.handle("alarm:pending", () => pendingAlarms);
+
+  ipcMain.handle("alarm:dismiss", (_, id) => {
+    resolveAlarm(id);
+    return true;
+  });
+
+  ipcMain.handle("alarm:done", (_, id) => {
+    const todos = loadTodos();
+    const i = todos.findIndex((x) => x.id === id);
+    if (i !== -1) {
+      todos[i].done = true;
+      saveTodos(todos);
+      broadcastTodos(todos);
+    }
+    resolveAlarm(id);
+    return true;
+  });
+
+  /** 推迟：把提醒时间改到 n 分钟后，并清掉已触发标记让它能再次触发 */
+  ipcMain.handle("alarm:snooze", (_, id, minutes) => {
+    const mins = Math.max(1, Math.min(24 * 60, Number(minutes) || 10));
+    const todos = loadTodos();
+    const i = todos.findIndex((x) => x.id === id);
+    if (i === -1) return null;
+    todos[i].alarmTime = new Date(Date.now() + mins * 60000).toISOString();
+    todos[i].alarmEnabled = true;
+    saveTodos(todos);
+    delete fired[id];
+    safeSaveFired();
+    broadcastTodos(todos);
+    resolveAlarm(id);
+    return todos[i];
   });
 
   ipcMain.handle("tile:show", () => toggleTile());

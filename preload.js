@@ -40,6 +40,15 @@ contextBridge.exposeInMainWorld("sticky", {
     close: () => ipcRenderer.invoke("win:close"),
   },
 
+  // 应用内提醒窗口（系统 toast 被关闭时的可靠兜底）
+  alarm: {
+    pending: () => ipcRenderer.invoke("alarm:pending"),
+    dismiss: (id) => ipcRenderer.invoke("alarm:dismiss", id),
+    done: (id) => ipcRenderer.invoke("alarm:done", id),
+    snooze: (id, minutes) => ipcRenderer.invoke("alarm:snooze", id, minutes),
+  },
+  onAlarms: on("alarms"),
+
   autostart: {
     get: () => ipcRenderer.invoke("autostart:get"),
     set: (v) => ipcRenderer.invoke("autostart:set", v),

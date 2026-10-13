@@ -7,9 +7,12 @@ Thumbs.db
 
 nul
 
-# build output (produced by scripts/deploy.js, not tracked)
+# build output
 dist/
 release/
+
+# local-only dev scaffolding (icons tooling, smoke tests, diagnostics)
+tools/
 
 # data lives in the user profile; these are just a safety net
 data.json
@@ -18,11 +21,10 @@ todos.json
 alarms-fired.json
 *.corrupt-*
 
-# diagnostics / self-check output (never commit these)
+# scratch files
 *.log
 *.log.err
 .smoke-*
-.prod.log*
 .gmsg-*.txt
 .gitmsg*.txt
 .commitmsg.txt

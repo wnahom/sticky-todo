@@ -136,7 +136,7 @@ function runningPids(exeName) {
   // ---------- 校验 ----------
   step("校验打包结果");
   try {
-    execFileSync(process.execPath, [path.join(ROOT, "tools", "verify-asar.js"), out, "--src", stage, "--list"], { stdio: "inherit" });
+    execFileSync(process.execPath, [path.join(ROOT, "scripts", "verify-asar.js"), out, "--src", stage, "--list"], { stdio: "inherit" });
   } catch {
     die("校验未通过，已中止部署（目标目录未被改动）");
   }
@@ -179,7 +179,7 @@ function runningPids(exeName) {
   // ---------- 落地校验 ----------
   step("落地校验");
   try {
-    execFileSync(process.execPath, [path.join(ROOT, "tools", "verify-asar.js"), targetAsar, "--src", stage], { stdio: "inherit" });
+    execFileSync(process.execPath, [path.join(ROOT, "scripts", "verify-asar.js"), targetAsar, "--src", stage], { stdio: "inherit" });
   } catch {
     die("部署后的文件校验失败！");
   }

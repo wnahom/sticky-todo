@@ -24,3 +24,7 @@ alarms-fired.json
 
 # 部署/自检日志
 .prod.log*
+
+# 提交信息临时文件
+.gitmsg*.txt
+.commitmsg.txt

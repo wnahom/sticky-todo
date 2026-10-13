@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld("sticky", {
     hide: () => ipcRenderer.invoke("tile:hide"),
     pin: () => ipcRenderer.invoke("tile:pin"),
     pinned: () => ipcRenderer.invoke("tile:pinned"),
+    bounds: () => ipcRenderer.invoke("tile:bounds"),
+    resize: (w, h) => ipcRenderer.invoke("tile:resize", w, h),
   },
 
   win: {
@@ -49,4 +51,7 @@ contextBridge.exposeInMainWorld("sticky", {
 
   // 托盘「新建待办」：把光标送进输入框
   onFocusInput: (cb) => on("focus-input")(() => cb()),
+
+  // 磁贴被拖动/缩放：设置面板据此同步尺寸滑块
+  onTileBoundsChanged: on("tile-bounds-changed"),
 });

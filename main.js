@@ -232,6 +232,7 @@ function rememberTileBounds() {
     if (!tileWin || tileWin.isDestroyed()) return;
     const b = tileWin.getBounds();
     saveConfig({ tileBounds: b, tileWidth: b.width, tileHeight: b.height });
+    broadcastTileBounds(b); // 让设置面板滑块同步，避免与拖拽结果不一致
   }, 500);
 }
 
@@ -284,6 +285,11 @@ function broadcastTodos(list) {
 
 function broadcastConfig(c) {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("config-changed", c);
+}
+
+/** 磁贴被拖动/缩放后通知主窗口，让设置面板的滑块跟着动 */
+function broadcastTileBounds(bounds) {
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("tile-bounds-changed", bounds);
 }
 
 /** 托盘提示显示未完成数量，鼠标悬停即可看到进度 */
@@ -507,6 +513,34 @@ function setupIPC() {
     tileWin.setAlwaysOnTop(onTop);
     saveConfig({ tilePinned: onTop }); // 持久化，重建窗口后保持一致
     return onTop;
+  });
+
+  /** 磁贴当前实际尺寸；窗口没开时回落到配置值 */
+  ipcMain.handle("tile:bounds", () => {
+    if (tileWin && !tileWin.isDestroyed()) return tileWin.getBounds();
+    const c = cfg();
+    const b = c.tileBounds;
+    return {
+      width: b?.width ?? c.tileWidth ?? 260,
+      height: b?.height ?? c.tileHeight ?? 360,
+    };
+  });
+
+  /**
+   * 从设置面板调整磁贴尺寸。
+   * 必须同时清掉 tileBounds —— 否则 createTile() 里的
+   * 「tileBounds 优先」逻辑会让这次修改在下次打开时被旧尺寸盖掉，
+   * 滑块看起来完全没作用。
+   */
+  ipcMain.handle("tile:resize", (_, w, h) => {
+    const width = Math.max(180, Math.min(2000, Math.round(Number(w) || 0)));
+    const height = Math.max(150, Math.min(2000, Math.round(Number(h) || 0)));
+    if (!width || !height) return null;
+    saveConfig({ tileWidth: width, tileHeight: height, tileBounds: null });
+    if (tileWin && !tileWin.isDestroyed()) {
+      tileWin.setSize(width, height); // resize 事件会经 rememberTileBounds 回写实际 bounds
+    }
+    return { width, height };
   });
 
   ipcMain.handle("win:minimize", () => { if (mainWin && !mainWin.isDestroyed()) mainWin.minimize(); });

@@ -153,3 +153,6 @@ npm run pack       # NSIS 安装包
 ## 许可
 
 [MIT](LICENSE) © 2026 mohan
+
+改动代码前请先看 [CONTRIBUTING.md](CONTRIBUTING.md) —— 记录了本环境两个反复踩到的坑
+（PowerShell 5.1 改文件会破坏编码、磁贴尺寸在高 DPI 屏上会被乘掉）。

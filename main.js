@@ -28,6 +28,8 @@ const CONFIG_FILE = path.join(DATA_DIR, "config.json");
 const FIRED_FILE = path.join(DATA_DIR, "alarms-fired.json");
 const BACKUP_KEEP = 3;
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const DEFAULT_CONFIG = {
   opacity: 0.92,
   alarmSound: true,
@@ -174,6 +176,12 @@ let mainWin = null;
 let tileWin = null;
 let tray = null;
 let tileSaveTimer = null;
+/**
+ * 用户一旦显式改过磁贴尺寸（设置面板滑块），就丢弃启动时排队中的
+ * 兜底 bounds 应用 —— 否则迟到的旧尺寸会覆盖用户的修改。
+ */
+let boundsDirty = false;
+let boundsTimer = null;
 
 function createMain() {
   if (mainWin && !mainWin.isDestroyed()) {
@@ -257,13 +265,28 @@ function rememberTileBounds() {
   }, 500);
 }
 
-function createTile() {
+/**
+ * 解析磁贴初始 bounds。
+ * 注意：不能把这些值交给 BrowserWindow 的 width/height 构造参数 ——
+ * 实测在本机双屏（100% + 150%）环境下，构造参数与「什么都不做仅移动窗口」
+ * 都会被乘上目标屏的缩放因子：请求 220x300 在 150% 屏上得到 330x450。
+ * 而 setBounds()/setSize() 则严格按 DIP 生效。
+ * 因此这里只算出数值，统一交给 ready-to-show 里的 setBounds() 落地。
+ */
+function resolveTileBounds() {
   const c = cfg();
   const saved = usableBounds(c.tileBounds);
+  if (saved) return saved;
+  const w = Math.min(Math.max(c.tileWidth || 260, 180), 2000);
+  const h = Math.min(Math.max(c.tileHeight || 360, 150), 2000);
+  return { width: w, height: h }; // 不指定 x/y，交给系统居中
+}
+
+function createTile() {
+  const c = cfg();
+  const bounds = resolveTileBounds();
+  boundsDirty = false; // 新窗口，重新允许启动阶段的尺寸纠正
   tileWin = new BrowserWindow({
-    width: saved ? saved.width : (c.tileWidth || 260),
-    height: saved ? saved.height : (c.tileHeight || 360),
-    ...(saved ? { x: saved.x, y: saved.y } : {}),
     frame: false,
     transparent: true,
     alwaysOnTop: c.tilePinned !== false, // 记住上次的置顶状态，避免重建后不一致
@@ -278,14 +301,53 @@ function createTile() {
     },
   });
   tileWin.loadFile(path.join(__dirname, "renderer", "tile.html"), { query: { mode: "tile" } });
-  tileWin.once("ready-to-show", () => {
+  tileWin.once("ready-to-show", async () => {
     if (!tileWin || tileWin.isDestroyed()) return;
-    tileWin.setOpacity(c.opacity ?? 0.92); // 创建时即应用，修正首启不透明的问题
-    tileWin.show();
+    const win = tileWin;
+
+    // --- 高 DPI 屏上的尺寸落地（本机双屏 100% + 150% 实测） ---
+    // 若在隐藏状态下立刻 show()，Windows 会按目标屏缩放因子重新解释尺寸，
+    // 把设定值乘掉（220x300 → 330x450）。可用做法：先在隐藏状态应用 bounds，
+    // 稍作停顿再显示；显示后再校验一次，不符则纠正。
+    // 两个定时器都必须可取消：用户在此期间改了尺寸（tile:resize）的话，
+    // 迟到的旧 bounds 会把它覆盖回去 —— 这个竞态已实测复现过。
+    applyTileBounds(bounds);
+    await sleep(150);
+    if (win.isDestroyed() || boundsDirty) return;
+    win.setOpacity(c.opacity ?? 0.92); // 首启不透明的问题在此一并修正
+    win.show();
+
+    boundsTimer = setTimeout(() => {
+      if (win.isDestroyed() || boundsDirty) return;
+      const b = win.getBounds();
+      if (b.width !== bounds.width || b.height !== bounds.height ||
+          (bounds.x !== undefined && (b.x !== bounds.x || b.y !== bounds.y))) {
+        applyTileBounds(bounds); // 兜底纠正被缩放掉的尺寸
+      }
+    }, 400);
   });
   tileWin.on("move", rememberTileBounds);
   tileWin.on("resize", rememberTileBounds);
-  tileWin.on("closed", () => { tileWin = null; });
+  tileWin.on("closed", () => {
+    tileWin = null;
+    if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
+  });
+}
+
+/**
+ * 把目标 bounds 落到磁贴窗口上。
+ * 必须在窗口已经显示之后再调用：本机双屏（100% + 150%）实测，
+ * 窗口在被移动到高 DPI 屏显示时，Windows 会按该屏缩放因子重新解释尺寸，
+ * 把之前（含构造参数）设定的值乘掉 —— 请求 220x300 会变成 330x450。
+ * 显示之后再 setBounds 才能得到精确的 DIP 尺寸。
+ */
+function applyTileBounds(bounds) {
+  if (!tileWin || tileWin.isDestroyed()) return;
+  try {
+    tileWin.setBounds(bounds);
+  } catch (e) {
+    console.error("[sticky] 应用磁贴尺寸失败:", e.message);
+  }
 }
 
 function toggleTile() {
@@ -672,6 +734,8 @@ function setupIPC() {
     const width = Math.max(180, Math.min(2000, Math.round(Number(w) || 0)));
     const height = Math.max(150, Math.min(2000, Math.round(Number(h) || 0)));
     if (!width || !height) return null;
+    boundsDirty = true; // 丢弃启动阶段排队中的兜底应用，避免覆盖这次修改
+    if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
     saveConfig({ tileWidth: width, tileHeight: height, tileBounds: null });
     if (tileWin && !tileWin.isDestroyed()) {
       tileWin.setSize(width, height); // resize 事件会经 rememberTileBounds 回写实际 bounds

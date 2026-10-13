@@ -1,0 +1,23 @@
+
+=== DISPLAY-SCALE ===
+  id=1975622415 scaleFactor=1.5 bounds={"x":1920,"y":0,"width":1707,"height":1067} workArea={"x":1920,"y":0,"width":1707,"height":1019}
+  id=187068150 scaleFactor=1 bounds={"x":0,"y":0,"width":1920,"height":1080} workArea={"x":0,"y":0,"width":1920,"height":1032}
+
+config tileWidth/Height = 260 x 360
+config tileBounds       = {"x":2020,"y":80,"width":260,"height":360}
+
+=== 磁贴实际尺寸 ===
+  初始                     getBounds=390x540 @(2020,80)  content=390x540  所在屏 scaleFactor=1.5
+
+=== 往返一致性（设为 220x300） ===
+  setSize(220,300) 后     getBounds=220x300 @(2020,80)  content=220x300  所在屏 scaleFactor=1.5
+  → 往返一致? 是 OK
+
+=== 移到各屏后尺寸是否变化 ===
+  移到屏 scaleFactor=1.5: 请求 220x300 → 实际 220x300 (落在 scaleFactor=1.5 的屏, 物理像素约 330x450)
+  移到屏 scaleFactor=1: 请求 220x300 → 实际 147x200 (落在 scaleFactor=1 的屏, 物理像素约 147x200)
+
+=== 防抖落盘后配置 ===
+  tileWidth/Height = 147 x 200
+  tileBounds       = {"x":40,"y":40,"width":147,"height":200}
+=== END ===

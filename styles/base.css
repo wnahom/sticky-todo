@@ -68,8 +68,6 @@ body{
 .range-group{display:flex;align-items:center;gap:8px;flex:1}
 .range-group span{font-size:13px;min-width:30px;text-align:right;color:var(--soft)}
 
-.hint{font-size:11px;color:var(--faint)}
-
 .footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 
 .btn{

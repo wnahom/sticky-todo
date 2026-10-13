@@ -133,3 +133,7 @@ npm run pack       # NSIS 安装包
 ```
 
 `dist/` 与 `release/` 都是构建产物，未纳入 git。
+
+## 许可
+
+[MIT](LICENSE) © 2026 mohan

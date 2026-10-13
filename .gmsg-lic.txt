@@ -1,0 +1,8 @@
+docs: 补充 MIT LICENSE 文件
+
+package.json 里早已声明 license 为 MIT，但仓库中一直没有实际文件，
+GitHub 因此识别不出许可证。现补上标准 MIT 全文：
+
+- 著作权人取 git 提交者 mohan，年份取当前提交年份 2026
+- package.json 补 author 字段
+- README 末尾补许可说明

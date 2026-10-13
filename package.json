@@ -36,6 +36,7 @@
     }
   },
   "license": "MIT",
+  "author": "mohan",
   "devDependencies": {
     "electron": "^42.5.0"
   }

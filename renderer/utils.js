@@ -28,7 +28,50 @@ export function toLocalTimeInput(d) {
   return `${pad2(x.getHours())}:${pad2(x.getMinutes())}`;
 }
 
-/** 10/13 18:55 */
+/** 当天零点（本地时区） */
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** 两个日期相差的自然天数（按本地日历日计算，不是 24 小时） */
+export function dayDiff(target, base = new Date()) {
+  return Math.round((startOfDay(target) - startOfDay(base)) / 86400000);
+}
+
+/**
+ * 时间点 → 便于一眼判断的短文本。
+ * 最近三天用「今天/明天/昨天」，同年省略年份，跨年补上年份。
+ */
+export function fmtSmart(iso, now = new Date()) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const diff = dayDiff(d, now);
+  const hhmm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  if (diff === 0) return `今天 ${hhmm}`;
+  if (diff === 1) return `明天 ${hhmm}`;
+  if (diff === -1) return `昨天 ${hhmm}`;
+  if (d.getFullYear() === new Date(now).getFullYear()) {
+    return `${d.getMonth() + 1}/${d.getDate()} ${hhmm}`;
+  }
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${hhmm}`;
+}
+
+/** 只有日期时（无具体时刻）→ 今天/明天/昨天 或 月/日 */
+export function fmtSmartDate(iso, now = new Date()) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const diff = dayDiff(d, now);
+  if (diff === 0) return "今天";
+  if (diff === 1) return "明天";
+  if (diff === -1) return "昨天";
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+/** 10/13 18:55（保留原始形式，供需要完整信息的场合） */
 export function fmtDateTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);

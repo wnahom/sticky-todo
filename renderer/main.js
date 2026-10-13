@@ -2,34 +2,62 @@
 // 主窗口入口：列表 + 提醒面板 + 设置面板 + 快捷键
 // ============================================================
 import { $, toLocalDateInput, toLocalTimeInput } from "./utils.js";
-import { store, renderList, wireToggle } from "./core.js";
+import { store, renderList, wireToggle, onMinuteTick } from "./core.js";
 
 const api = window.sticky;
 
 let alarmTargetId = null;
+
+/** 输入法组合期间不要触发提交（中文输入按 Enter 是上屏，不是确认） */
+const isComposing = (e) => e.isComposing || e.keyCode === 229;
 
 // ---------- 渲染 ----------
 function render() {
   const c = store.counts();
   $("countBadge").textContent = `${c.active}/${c.total}`;
 
+  // 重渲染会重建 innerHTML，先记录焦点与滚动位置，稍后还原
+  const active = document.activeElement;
+  const refocusId = active && active.id === "todoInput" ? "todoInput" : null;
   const list = $("todoList");
-  const visible = store.visible();
-  renderList(list, visible, {
+  const scrollTop = list.scrollTop;
+
+  renderList(list, store.visible(), {
     variant: "main",
     emptyText: store.todos.length ? "没有匹配的待办" : "还没有待办事项",
   });
   if (store.editingId) mountEditor(store.editingId);
+
+  list.scrollTop = scrollTop;
+  // 编辑态下输入框有自己的焦点，不要抢回来
+  if (refocusId && !store.editingId) {
+    const el = $(refocusId);
+    if (el && el.selectionStart === 0 && el.selectionEnd === 0) {
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }
 }
 
 // ---------- 新增 ----------
 $("todoInput").addEventListener("keydown", async (e) => {
-  if (e.key !== "Enter") return;
+  if (e.key !== "Enter" || isComposing(e)) return;
   const input = $("todoInput");
   const text = input.value.trim();
   if (!text) return;
-  input.value = "";
-  await store.add(text);
+  // 先尝试保存，成功后再清空输入框 —— 失败时文字还在，用户不用重打
+  const created = await store.add(text);
+  if (created) input.value = "";
+});
+
+// ---------- 筛选 ----------
+document.querySelectorAll("[data-filter]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    store.setFilter(btn.dataset.filter);
+    document.querySelectorAll("[data-filter]").forEach((b) => {
+      b.classList.toggle("active", b === btn);
+    });
+  });
 });
 
 // ---------- 列表交互 ----------
@@ -190,8 +218,29 @@ document.querySelectorAll(".overlay").forEach((el) => {
 store.subscribe(render);
 api.onTodosChanged((todos) => store.setTodos(todos));
 api.onConfigChanged((c) => { Object.assign(store.config, c); });
+// 托盘「新建待办」唤出窗口后把光标送进输入框
+api.onFocusInput(() => {
+  const el = $("todoInput");
+  if (el) { el.focus(); el.select(); }
+});
+// 「今天/明天」这类相对时间需要随时间推移刷新
+onMinuteTick(render);
 
 (async () => {
-  await store.load();
+  try {
+    await store.load();
+  } catch (e) {
+    console.error("[sticky] 初始加载失败:", e);
+    const list = $("todoList");
+    list.innerHTML = '<div class="empty"><div class="txt">读取待办失败，请检查数据目录权限</div></div>';
+    const btn = document.createElement("button");
+    btn.className = "btn btn-secondary";
+    btn.textContent = "重试";
+    btn.addEventListener("click", async () => {
+      try { await store.load(); } catch { /* 仍失败则保持提示 */ }
+    });
+    list.querySelector(".empty").appendChild(btn);
+    return;
+  }
   store.setFilter("all");
 })();

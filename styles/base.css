@@ -92,6 +92,23 @@ body{
   font-size:13px;
 }
 
+/* ---------- 轻提示（写入失败等） ---------- */
+.toast-host{
+  position:fixed;left:50%;bottom:18px;z-index:200;
+  transform:translate(-50%,12px);
+  max-width:min(420px,86vw);
+  padding:9px 16px;
+  border-radius:8px;
+  background:#3a3a3a;color:#fff;
+  font-size:12.5px;line-height:1.4;
+  box-shadow:0 4px 18px rgba(0,0,0,.22);
+  opacity:0;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;
+}
+.toast-host.show{opacity:1;transform:translate(-50%,0)}
+.toast-host[data-kind="error"]{background:#c0392b}
+.toast-host[data-kind="ok"]{background:#237a4a}
+
 /* ============================================================
    待办条目 —— 主窗口与磁贴唯一的共用渲染产物
    两份视图只通过 data-* 与修饰类区分，不再各写一套模板

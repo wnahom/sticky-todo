@@ -34,6 +34,7 @@ const DEFAULT_CONFIG = {
   tileWidth: 260,
   tileHeight: 360,
   tileBounds: null,
+  tilePinned: true,
 };
 
 // ============================================================
@@ -243,7 +244,7 @@ function createTile() {
     ...(saved ? { x: saved.x, y: saved.y } : {}),
     frame: false,
     transparent: true,
-    alwaysOnTop: true,
+    alwaysOnTop: c.tilePinned !== false, // 记住上次的置顶状态，避免重建后不一致
     skipTaskbar: true,
     resizable: true,
     show: false,
@@ -278,10 +279,33 @@ function broadcastTodos(list) {
   for (const w of [mainWin, tileWin]) {
     if (w && !w.isDestroyed()) w.webContents.send("todos-changed", list);
   }
+  updateTrayTooltip(list);
 }
 
 function broadcastConfig(c) {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("config-changed", c);
+}
+
+/** 托盘提示显示未完成数量，鼠标悬停即可看到进度 */
+function updateTrayTooltip(list) {
+  if (!tray) return;
+  try {
+    const todos = list || loadTodos();
+    const now = Date.now();
+    const active = todos.filter((t) => !t.done).length;
+    const overdue = todos.filter(
+      (t) => !t.done && t.alarmEnabled && t.alarmTime && new Date(t.alarmTime).getTime() < now
+    ).length;
+    tray.setToolTip(
+      overdue
+        ? `Sticky Todo — 未完成 ${active} 项（${overdue} 项已逾期）`
+        : active
+          ? `Sticky Todo — 未完成 ${active} 项`
+          : "Sticky Todo — 全部完成"
+    );
+  } catch (e) {
+    console.error("[sticky] 更新托盘提示失败:", e.message);
+  }
 }
 
 // ============================================================
@@ -301,13 +325,29 @@ function createTray() {
   }
   tray.setToolTip("Sticky Todo");
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "打开主窗口", click: () => createMain() },
+    { label: "新建待办…", click: focusQuickAdd },
     { type: "separator" },
+    { label: "打开主窗口", click: () => createMain() },
     { label: "磁贴", click: toggleTile },
     { type: "separator" },
     { label: "退出", click: () => { app.isQuitting = true; app.quit(); } },
   ]));
   tray.on("double-click", () => createMain());
+  updateTrayTooltip();
+}
+
+/** 从托盘快捷录入：唤出主窗口并把光标放进输入框 */
+function focusQuickAdd() {
+  createMain();
+  if (!mainWin || mainWin.isDestroyed()) return;
+  mainWin.show();
+  mainWin.focus();
+  const send = () => {
+    if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("focus-input");
+  };
+  // 首次创建时页面还没就绪，事件会丢，等加载完再发
+  if (mainWin.webContents.isLoading()) mainWin.webContents.once("did-finish-load", send);
+  else send();
 }
 
 // ============================================================
@@ -316,9 +356,21 @@ function createTray() {
 let alarmTimer = null;
 const fired = loadFired();
 
+/**
+ * 已触发标记不是用户数据，写入失败只可能造成重复提醒，
+ * 不该让它抛出中断整轮闹钟检查（磁盘只读时会连锁报错）。
+ */
+function safeSaveFired() {
+  try {
+    saveFired(fired);
+  } catch (e) {
+    console.error("[sticky] 记录已触发提醒失败:", e.message);
+  }
+}
+
 function fireAlarm(t) {
   fired[t.id] = Date.now();
-  saveFired(fired);
+  safeSaveFired();
   if (!Notification.isSupported()) {
     console.warn("[sticky] 系统通知不可用，闹钟仅在应用内提示");
     return;
@@ -354,7 +406,7 @@ function checkAlarms() {
     if (at <= now) {
       if (now - at > 12 * 3600 * 1000) {
         fired[t.id] = now; // 太久远的不补报，只记账
-        saveFired(fired);
+        safeSaveFired();
         continue;
       }
       fireAlarm(t);
@@ -409,7 +461,7 @@ function setupIPC() {
     }
     if (Object.prototype.hasOwnProperty.call(patch, "alarmTime")) {
       delete fired[id]; // 改了提醒时间就重置已触发标记
-      saveFired(fired);
+      safeSaveFired();
     }
     todos[i] = { ...todos[i], ...patch };
     saveTodos(todos);
@@ -431,7 +483,7 @@ function setupIPC() {
     const todos = loadTodos().filter((x) => x.id !== id);
     saveTodos(todos);
     delete fired[id];
-    saveFired(fired);
+    safeSaveFired();
     broadcastTodos(todos);
     return true;
   });
@@ -445,10 +497,15 @@ function setupIPC() {
 
   ipcMain.handle("tile:show", () => toggleTile());
   ipcMain.handle("tile:hide", () => { if (tileWin && !tileWin.isDestroyed()) tileWin.hide(); });
+  ipcMain.handle("tile:pinned", () => {
+    if (!tileWin || tileWin.isDestroyed()) return cfg().tilePinned !== false;
+    return tileWin.isAlwaysOnTop();
+  });
   ipcMain.handle("tile:pin", () => {
     if (!tileWin || tileWin.isDestroyed()) return false;
     const onTop = !tileWin.isAlwaysOnTop();
     tileWin.setAlwaysOnTop(onTop);
+    saveConfig({ tilePinned: onTop }); // 持久化，重建窗口后保持一致
     return onTop;
   });
 

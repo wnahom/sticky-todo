@@ -35,6 +35,17 @@ header .btn.close:hover{background:#fde8e8}
 .input-area input:focus{border-color:var(--accent);border-style:solid}
 .input-area input::placeholder{color:var(--faint)}
 
+/* ---------- 筛选条 ---------- */
+.filters{display:flex;gap:6px;margin-top:8px}
+.chip{
+  padding:3px 10px;
+  border:1px solid var(--border);border-radius:12px;
+  background:transparent;color:var(--soft);
+  font-size:11px;font-family:inherit;cursor:pointer;transition:.15s;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.active{background:var(--accent-light);border-color:var(--accent);color:var(--accent);font-weight:600}
+
 /* ---------- 列表 ---------- */
 .list{flex:1;padding:4px 10px 10px}
 

@@ -39,7 +39,13 @@
   </header>
 
   <div class="input-area">
-    <input type="text" id="todoInput" placeholder="输入新待办，按 Enter 添加..." autofocus>
+    <input type="text" id="todoInput" placeholder="输入新待办，按 Enter 添加...">
+    <div class="filters no-drag">
+      <button class="chip active" data-filter="all">全部</button>
+      <button class="chip" data-filter="active">未完成</button>
+      <button class="chip" data-filter="done">已完成</button>
+      <button class="chip" data-filter="alarmed">有提醒</button>
+    </div>
   </div>
 
   <div class="list scroll-host" id="todoList"></div>

@@ -5,9 +5,45 @@
 // render() / renderTile() 已合并为 renderList()：
 // 逾期判定、提醒时间显示、勾选态只有一份实现。
 // ============================================================
-import { esc, fmtDate, fmtDateTime, isOverdue } from "./utils.js";
+import { esc, fmtSmart, fmtSmartDate, isOverdue } from "./utils.js";
 
 const api = window.sticky;
+
+// ============================================================
+// 轻提示：主进程写入失败时，渲染层必须让用户看见
+// ------------------------------------------------------------
+// 主进程的 IPC 处理器会把 fs 错误 reject 回来（已实测），
+// 但此前渲染层只有未处理的 Promise 拒绝 —— 用户输入被清空、
+// 界面看起来一切正常，实际上什么都没保存。
+// ============================================================
+let toastHost = null;
+let toastTimer = null;
+
+export function toast(message, kind = "error") {
+  if (!toastHost) {
+    toastHost = document.createElement("div");
+    toastHost.className = "toast-host";
+    document.body.appendChild(toastHost);
+  }
+  toastHost.textContent = message;
+  toastHost.dataset.kind = kind;
+  toastHost.classList.add("show");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastHost.classList.remove("show"), 4000);
+}
+
+/** 统一包装：把失败转成可见提示 + 重新以磁盘状态为准 */
+async function attempt(label, fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    const msg = String((e && e.message) || e);
+    console.error(`[sticky] ${label} 失败:`, msg);
+    toast(`${label}失败：${/EPERM|EACCES|EROFS/.test(msg) ? "文件不可写（磁盘只读或权限不足）" : "操作未保存"}`);
+    try { await store.load(); } catch { /* 连读取都失败就保持现状 */ }
+    return null;
+  }
+}
 
 export const FILTERS = {
   all: () => true,
@@ -70,24 +106,44 @@ export const store = {
     return state.config;
   },
 
+  // 以下写操作都经 attempt 包装：失败会弹出提示并以磁盘状态回滚界面
   async add(text) {
     const clean = String(text ?? "").trim();
     if (!clean) return null;
-    const created = await api.todos.create(clean);
-    await this.load(); // 以主进程返回的 id 为准，避免两端 id 不一致
-    return created;
+    return attempt("添加", async () => {
+      const created = await api.todos.create(clean);
+      await this.load(); // 以主进程返回的 id 为准，避免两端 id 不一致
+      return created;
+    });
   },
 
-  async toggle(id) { await api.todos.toggle(id); await this.load(); },
+  async toggle(id) {
+    return attempt("切换完成状态", async () => {
+      await api.todos.toggle(id);
+      await this.load();
+    });
+  },
 
-  async remove(id) { await api.todos.remove(id); await this.load(); },
+  async remove(id) {
+    return attempt("删除", async () => {
+      await api.todos.remove(id);
+      await this.load();
+    });
+  },
 
-  async update(id, patch) { await api.todos.update(id, patch); await this.load(); },
+  async update(id, patch) {
+    return attempt("保存", async () => {
+      await api.todos.update(id, patch);
+      await this.load();
+    });
+  },
 
   async saveConfig(patch) {
-    state.config = { ...state.config, ...(await api.config.save(patch)) };
-    emit();
-    return state.config;
+    return attempt("保存设置", async () => {
+      state.config = { ...state.config, ...(await api.config.save(patch)) };
+      emit();
+      return state.config;
+    });
   },
 };
 
@@ -113,14 +169,14 @@ function actionsHtml() {
  * 待办条目模板 —— 主窗口与磁贴唯一的来源。
  * variant: "main" | "tile"
  */
-export function todoHtml(t, { variant = "main", now = Date.now() } = {}) {
-  const over = isOverdue(t, now);
+export function todoHtml(t, { variant = "main", now = new Date() } = {}) {
+  const over = isOverdue(t, now.getTime());
   const cls = ["todo", t.done ? "done" : "", over ? "overdue" : ""].filter(Boolean).join(" ");
 
-  // 提醒时间优先，其次截止日期
+  // 提醒时间优先，其次截止日期；用「今天/明天/昨天」减少换算负担
   let metaText = "";
-  if (t.alarmEnabled && t.alarmTime) metaText = fmtDateTime(t.alarmTime);
-  else if (t.dueDate) metaText = fmtDate(t.dueDate);
+  if (t.alarmEnabled && t.alarmTime) metaText = fmtSmart(t.alarmTime, now);
+  else if (t.dueDate) metaText = fmtSmartDate(t.dueDate, now);
   const meta = metaText
     ? `<div class="todo-meta${over ? " over" : ""}"><span class="due${over ? " over" : ""}">${esc(metaText)}</span></div>`
     : "";
@@ -151,8 +207,20 @@ export function renderList(container, todos, opts = {}) {
     container.innerHTML = `<div class="${variant === "tile" ? "tile-empty" : "empty"}">${esc(emptyText)}</div>`;
     return;
   }
-  const now = Date.now();
+  const now = new Date();
   container.innerHTML = todos.map((t) => todoHtml(t, { variant, now })).join("");
+}
+
+/**
+ * 每分钟触发一次回调，用于刷新「今天/明天」这类相对时间。
+ * 原先只在数据变化时重渲染，窗口开久了日期标签就停在旧值。
+ */
+export function onMinuteTick(fn) {
+  let last = new Date().getMinutes();
+  setInterval(() => {
+    const m = new Date().getMinutes();
+    if (m !== last) { last = m; try { fn(); } catch (e) { console.error(e); } }
+  }, 20000);
 }
 
 // ============================================================

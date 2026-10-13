@@ -7,25 +7,22 @@ Thumbs.db
 
 nul
 
-# 构建产物（由 scripts/deploy.ps1 生成并部署，不入库）
+# build output (produced by scripts/deploy.js, not tracked)
 dist/
 release/
 
-# 数据落在用户目录，这里只是兜底
+# data lives in the user profile; these are just a safety net
 data.json
 config.json
 todos.json
 alarms-fired.json
 *.corrupt-*
 
-# 自检临时输出
-.smoke-*.log
-.smoke-*.log.err
-
-# ����/�Լ���־
+# diagnostics / self-check output (never commit these)
+*.log
+*.log.err
+.smoke-*
 .prod.log*
-
-# �ύ��Ϣ��ʱ�ļ�
+.gmsg-*.txt
 .gitmsg*.txt
 .commitmsg.txt
-.gmsg-*.txt

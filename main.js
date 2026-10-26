@@ -254,6 +254,26 @@ function usableBounds(saved) {
   return { x, y, width: fitW, height: fitH };
 }
 
+/** 置顶的意图以配置为准（窗口的实际 TOPMOST 位可能被系统事件丢掉） */
+function tilePinnedIntent() {
+  return cfg().tilePinned !== false;
+}
+
+/**
+ * 把置顶意图重新应用到磁贴窗口。
+ * 实测（本机双屏 100% + 150%）窗口的 WS_EX_TOPMOST 位有时会丢失，
+ * 而 Electron 自己的 isAlwaysOnTop() 仍报 true —— 两者会脱节。
+ * 因此在「显示、拖动、缩放、切换置顶」后都按配置重新落一次，让状态自我纠正。
+ */
+function applyTilePinned() {
+  if (!tileWin || tileWin.isDestroyed()) return;
+  try {
+    tileWin.setAlwaysOnTop(tilePinnedIntent());
+  } catch (e) {
+    console.error("[sticky] 应用置顶状态失败:", e.message);
+  }
+}
+
 function rememberTileBounds() {
   if (!tileWin || tileWin.isDestroyed() || tileWin.isMinimized()) return;
   if (tileSaveTimer) clearTimeout(tileSaveTimer);
@@ -263,6 +283,7 @@ function rememberTileBounds() {
     const b = tileWin.getBounds();
     saveConfig({ tileBounds: b, tileWidth: b.width, tileHeight: b.height });
     broadcastTileBounds(b); // 让设置面板滑块同步，避免与拖拽结果不一致
+    applyTilePinned(); // 跨屏拖动后系统可能丢掉置顶，这里补回
   }, 500);
 }
 
@@ -290,7 +311,7 @@ function createTile() {
   tileWin = new BrowserWindow({
     frame: false,
     transparent: true,
-    alwaysOnTop: c.tilePinned !== false, // 记住上次的置顶状态，避免重建后不一致
+    alwaysOnTop: tilePinnedIntent(),
     skipTaskbar: true,
     resizable: true,
     show: false,
@@ -317,6 +338,7 @@ function createTile() {
     if (win.isDestroyed() || boundsDirty) return;
     win.setOpacity(c.opacity ?? 0.92); // 首启不透明的问题在此一并修正
     win.show();
+    applyTilePinned(); // 显示之后再落一次置顶，防止系统在迁移显示器时丢掉
 
     boundsTimer = setTimeout(() => {
       if (win.isDestroyed() || boundsDirty) return;
@@ -325,6 +347,7 @@ function createTile() {
           (bounds.x !== undefined && (b.x !== bounds.x || b.y !== bounds.y))) {
         applyTileBounds(bounds); // 兜底纠正被缩放掉的尺寸
       }
+      applyTilePinned();
     }, 400);
   });
   tileWin.on("move", rememberTileBounds);
@@ -354,7 +377,11 @@ function applyTileBounds(bounds) {
 function toggleTile() {
   if (tileWin && !tileWin.isDestroyed()) {
     if (tileWin.isVisible()) tileWin.hide();
-    else { tileWin.show(); tileWin.focus(); }
+    else {
+      tileWin.show();
+      tileWin.focus();
+      applyTilePinned(); // 重新显示时按配置补回置顶
+    }
   } else {
     createTile();
   }
@@ -772,16 +799,14 @@ function setupIPC() {
 
   ipcMain.handle("tile:show", () => toggleTile());
   ipcMain.handle("tile:hide", () => { if (tileWin && !tileWin.isDestroyed()) tileWin.hide(); });
-  ipcMain.handle("tile:pinned", () => {
-    if (!tileWin || tileWin.isDestroyed()) return cfg().tilePinned !== false;
-    return tileWin.isAlwaysOnTop();
-  });
+  ipcMain.handle("tile:pinned", () => tilePinnedIntent());
   ipcMain.handle("tile:pin", () => {
-    if (!tileWin || tileWin.isDestroyed()) return false;
-    const onTop = !tileWin.isAlwaysOnTop();
-    tileWin.setAlwaysOnTop(onTop);
-    saveConfig({ tilePinned: onTop }); // 持久化，重建窗口后保持一致
-    return onTop;
+    // 以配置为唯一真相：窗口的 TOPMOST 位可能被系统丢掉，
+    // 若拿 isAlwaysOnTop() 取反，会和用户看到的按钮状态脱节
+    const next = !tilePinnedIntent();
+    saveConfig({ tilePinned: next });
+    applyTilePinned();
+    return next;
   });
 
   /** 磁贴当前实际尺寸；窗口没开时回落到配置值 */

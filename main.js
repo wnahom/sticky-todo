@@ -183,6 +183,8 @@ let tileSaveTimer = null;
  */
 let boundsDirty = false;
 let boundsTimer = null;
+/** 置顶看门狗：定期检查磁贴是否真的置顶，被系统丢掉时补回 */
+let tileWatch = null;
 
 function createMain() {
   if (mainWin && !mainWin.isDestroyed()) {
@@ -260,15 +262,28 @@ function tilePinnedIntent() {
 }
 
 /**
- * 把置顶意图重新应用到磁贴窗口。
- * 实测（本机双屏 100% + 150%）窗口的 WS_EX_TOPMOST 位有时会丢失，
- * 而 Electron 自己的 isAlwaysOnTop() 仍报 true —— 两者会脱节。
- * 因此在「显示、拖动、缩放、切换置顶」后都按配置重新落一次，让状态自我纠正。
+ * 把置顶意图落到磁贴窗口上。
+ *
+ * 背景：窗口的 WS_EX_TOPMOST 位会被系统在各种时机丢掉（跨显示器、点击、拖动…），
+ * 丢掉之后窗口就沉到其它窗口下面，而且"点它/拖它"也回不到顶层 —— 这不是用户
+ * 期待的普通窗口行为。
+ *
+ * 实测 Electron 的 isAlwaysOnTop() 会跟随系统的真实状态，因此这里只在真的
+ * 不一致时才下发一次，避免每次调用都把窗口重新排一次（会造成闪烁）。
  */
 function applyTilePinned() {
   if (!tileWin || tileWin.isDestroyed()) return;
+  if (tileWin.isMinimized() || !tileWin.isVisible()) return;
+  const want = tilePinnedIntent();
+  let actual;
   try {
-    tileWin.setAlwaysOnTop(tilePinnedIntent());
+    actual = tileWin.isAlwaysOnTop();
+  } catch {
+    return;
+  }
+  if (actual === want) return;
+  try {
+    tileWin.setAlwaysOnTop(want);
   } catch (e) {
     console.error("[sticky] 应用置顶状态失败:", e.message);
   }
@@ -352,9 +367,16 @@ function createTile() {
   });
   tileWin.on("move", rememberTileBounds);
   tileWin.on("resize", rememberTileBounds);
+  // 点击磁贴（聚焦）时也补一次：实测点击会让系统丢掉 TOPMOST 位
+  tileWin.on("focus", applyTilePinned);
+  // 看门狗：系统在任何时刻丢掉置顶位都能在 1 秒内补回。
+  // 已经置顶时 applyTilePinned 会直接返回，不做任何窗口操作。
+  if (tileWatch) clearInterval(tileWatch);
+  tileWatch = setInterval(applyTilePinned, 1000);
   tileWin.on("closed", () => {
     tileWin = null;
     if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
+    if (tileWatch) { clearInterval(tileWatch); tileWatch = null; }
   });
 }
 

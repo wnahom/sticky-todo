@@ -134,6 +134,9 @@ function mountEditor() {
   inp.select();
 
   let settled = false;
+  // Shift+Enter：保存本次修改后立刻展开子项输入，便于连续录入多个子项
+  let openChildAfter = false;
+
   const finish = async (save) => {
     if (settled) return;
     settled = true;
@@ -143,12 +146,26 @@ function mountEditor() {
       if (childId) await store.renameChild(parentId, childId, v);
       else await store.update(parentId, { text: v });
     } else render();
+    // 渲染完成后再挂输入框，保证父项行已存在
+    if (openChildAfter) {
+      openChildAfter = false;
+      openChildInput(parentId);
+    }
   };
 
   inp.addEventListener("blur", () => finish(true));
   inp.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") inp.blur();
-    else if (e.key === "Escape") { inp.value = original.text; inp.blur(); }
+    if (e.key === "Enter") {
+      // Shift+Enter 只对父项生效：保存文字后直接展开子项输入。
+      // 子项本身按 Enter 就是保存，没有更深一层。
+      if (e.shiftKey && !childId) openChildAfter = true;
+      e.preventDefault();
+      inp.blur();
+    } else if (e.key === "Escape") {
+      openChildAfter = false;
+      inp.value = original.text;
+      inp.blur();
+    }
   });
 }
 

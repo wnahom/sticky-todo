@@ -38,6 +38,7 @@ const DEFAULT_CONFIG = {
   tileHeight: 360,
   tileBounds: null,
   tilePinned: true,
+  focusId: null, // 当前专注的待办 id；只存一条，属于界面状态
 };
 
 // ============================================================
@@ -367,7 +368,10 @@ function broadcastTodos(list) {
 }
 
 function broadcastConfig(c) {
-  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("config-changed", c);
+  // 磁贴也要知道 focusId（它据此决定只显示专注项），所以两个窗口都发
+  for (const w of [mainWin, tileWin]) {
+    if (w && !w.isDestroyed()) w.webContents.send("config-changed", c);
+  }
 }
 
 /** 磁贴被拖动/缩放后通知主窗口，让设置面板的滑块跟着动 */
@@ -595,6 +599,39 @@ function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+/**
+ * 规范化子项数组：过滤非法项与空文本，限制数量，补齐 id。
+ * 子项只有 id/text/done —— 不带提醒与日期，避免数据模型膨胀。
+ */
+function normalizeChildren(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((c) => c && typeof c === "object")
+    .map((c) => ({
+      id: c.id ? String(c.id) : newId(),
+      text: String(c.text ?? "").trim(),
+      done: !!c.done,
+    }))
+    .filter((c) => c.text)
+    .slice(0, 200);
+}
+
+/** 有子项时，父项的完成状态由子项派生（全完成才算完成） */
+function deriveParentDone(t) {
+  if (Array.isArray(t.children) && t.children.length) {
+    t.done = t.children.every((c) => c.done);
+  }
+  return t;
+}
+
+/** 专注项被完成或删除时清空焦点，避免焦点停在看不到/已完成的行上 */
+function clearFocusIf(id) {
+  if (cfg().focusId !== id) return false;
+  const c = saveConfig({ focusId: null });
+  broadcastConfig(c);
+  return true;
+}
+
 function setupIPC() {
   ipcMain.handle("todos:list", () => loadTodos());
 
@@ -622,7 +659,7 @@ function setupIPC() {
     const i = todos.findIndex((x) => x.id === id);
     if (i === -1) return null;
     // 白名单字段，避免渲染层写入任意键
-    const allowed = ["text", "done", "dueDate", "alarmEnabled", "alarmTime"];
+    const allowed = ["text", "done", "dueDate", "alarmEnabled", "alarmTime", "children"];
     const patch = {};
     for (const k of allowed) {
       if (updates && Object.prototype.hasOwnProperty.call(updates, k)) patch[k] = updates[k];
@@ -631,8 +668,15 @@ function setupIPC() {
       delete fired[id]; // 改了提醒时间就重置已触发标记
       safeSaveFired();
     }
-    todos[i] = { ...todos[i], ...patch };
+    if (Object.prototype.hasOwnProperty.call(patch, "children")) {
+      patch.children = normalizeChildren(patch.children);
+    }
+    const next = { ...todos[i], ...patch };
+    // 子项存在时以子项为准；没有子项则尊重显式传入的 done
+    if (Array.isArray(next.children) && next.children.length) deriveParentDone(next);
+    todos[i] = next;
     saveTodos(todos);
+    if (next.done) clearFocusIf(id);
     broadcastTodos(todos);
     return todos[i];
   });
@@ -641,10 +685,32 @@ function setupIPC() {
     const todos = loadTodos();
     const i = todos.findIndex((x) => x.id === id);
     if (i === -1) return null;
-    todos[i].done = !todos[i].done;
+    const t = todos[i];
+    const next = !t.done;
+    t.done = next;
+    // 勾父项 = 级联所有子项（含"全选/全不选"两向）
+    if (Array.isArray(t.children) && t.children.length) {
+      for (const c of t.children) c.done = next;
+    }
     saveTodos(todos);
+    if (next) clearFocusIf(id);
     broadcastTodos(todos);
-    return todos[i];
+    return t;
+  });
+
+  /** 切换单个子项；父项完成状态随之派生。放在主进程做，磁贴勾选也一致 */
+  ipcMain.handle("todos:toggle-child", (_, parentId, childId) => {
+    const todos = loadTodos();
+    const p = todos.find((x) => x.id === parentId);
+    if (!p || !Array.isArray(p.children)) return null;
+    const c = p.children.find((x) => x.id === childId);
+    if (!c) return null;
+    c.done = !c.done;
+    deriveParentDone(p);
+    saveTodos(todos);
+    if (p.done) clearFocusIf(parentId);
+    broadcastTodos(todos);
+    return p;
   });
 
   ipcMain.handle("todos:delete", (_, id) => {
@@ -652,6 +718,7 @@ function setupIPC() {
     saveTodos(todos);
     delete fired[id];
     safeSaveFired();
+    clearFocusIf(id);
     broadcastTodos(todos);
     return true;
   });
@@ -676,7 +743,11 @@ function setupIPC() {
     const i = todos.findIndex((x) => x.id === id);
     if (i !== -1) {
       todos[i].done = true;
+      if (Array.isArray(todos[i].children)) {
+        for (const c of todos[i].children) c.done = true;
+      }
       saveTodos(todos);
+      clearFocusIf(id);
       broadcastTodos(todos);
     }
     resolveAlarm(id);

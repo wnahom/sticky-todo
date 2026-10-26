@@ -64,6 +64,35 @@ header .btn.close:hover{background:#fde8e8}
 .todo-text{font-size:14px;line-height:1.5;cursor:text}
 .todo-meta{margin-top:4px;font-size:11px}
 
+/* ---------- 子项（主窗口） ---------- */
+.todo.todo--child{padding:6px 12px 6px 40px}
+.todo.todo--child .todo-check{width:16px;height:16px;min-width:16px;font-size:10px;margin-top:1px}
+.todo.todo--child .todo-text{font-size:13px}
+.todo.todo--child .todo-actions button{width:24px;height:24px}
+
+/* 子项输入行（点「＋子项」后出现） */
+.todo-child-input{
+  display:flex;align-items:center;gap:10px;
+  padding:6px 12px 6px 40px;margin-bottom:4px;
+}
+.todo-child-input .todo-check{
+  width:16px;height:16px;min-width:16px;
+  border-style:dashed;opacity:.45;cursor:default;
+}
+.todo-child-input input{
+  flex:1;padding:3px 8px;
+  border:1px solid var(--accent);border-radius:5px;
+  font-size:13px;font-family:inherit;background:#fff;outline:none;
+}
+
+/* ---------- 专注：其余条目变暗 ----------
+   只在专注项确实可见时由 renderList 加上 .has-focus。
+   子项用 .in-focus 跟随父项保持高亮。                              */
+.list.has-focus .todo:not(.todo--focus):not(.in-focus){opacity:.38}
+.list.has-focus .todo:not(.todo--focus):not(.in-focus):hover{opacity:.75}
+.list.has-focus .todo--focus,
+.list.has-focus .todo.in-focus{opacity:1}
+
 /* 编辑态：用输入框替换文本节点 */
 .edit-input{
   width:100%;padding:4px 8px;

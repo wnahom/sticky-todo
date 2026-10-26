@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("sticky", {
     create: (text) => ipcRenderer.invoke("todos:create", text),
     update: (id, patch) => ipcRenderer.invoke("todos:update", id, patch),
     toggle: (id) => ipcRenderer.invoke("todos:toggle", id),
+    toggleChild: (parentId, childId) => ipcRenderer.invoke("todos:toggle-child", parentId, childId),
     remove: (id) => ipcRenderer.invoke("todos:delete", id),
   },
 

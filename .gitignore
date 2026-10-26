@@ -25,6 +25,7 @@ alarms-fired.json
 *.log
 *.log.err
 .smoke-*
+.shots/
 .gmsg-*.txt
 .gitmsg*.txt
 .commitmsg.txt

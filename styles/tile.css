@@ -81,4 +81,23 @@ body{
 .todo-meta{margin-left:4px;font-size:9px;white-space:nowrap;opacity:.6}
 .todo-meta.over{color:var(--danger);opacity:1;font-weight:600}
 
+/* ---------- 子项（磁贴：更紧凑） ---------- */
+.todo.todo--child{padding:3px 2px 3px 16px;font-size:11px;gap:4px}
+.todo.todo--child .todo-check{width:10px;height:10px;min-width:10px;font-size:5px}
+.todo.todo--child .todo-text{font-size:11px}
+.todo.todo--child.overdue{border-left-width:0;background:transparent}
+
+/* ---------- 进度与折叠（磁贴） ---------- */
+.todo-progress{margin-left:4px;font-size:9px;opacity:.75}
+.todo-chevron{width:16px;height:16px;margin-left:2px;opacity:.6}
+.todo-chevron:hover{opacity:1;background:transparent}
+
+/* 有专注时磁贴只显示那一条，不需要"抬起"效果 */
+.todo--focus{
+  background:transparent;
+  border-color:transparent;
+  border-left-width:0;
+  box-shadow:none;
+}
+
 .tile-empty{padding:24px 10px;text-align:center;font-size:11px;color:var(--faint);opacity:.4}

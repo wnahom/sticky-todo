@@ -135,3 +135,39 @@ body{
 
 .todo.done .todo-text{text-decoration:line-through;color:var(--faint)}
 .todo.overdue{border-left:3px solid var(--danger)}
+
+/* ---------- 专注项：靠"抬起"强调，不占用逾期那条红色竖条 ---------- */
+.todo--focus{
+  border-color:var(--accent);
+  border-left:3px solid var(--accent);
+  background:#fffdf8;
+  box-shadow:0 2px 10px rgba(196,154,108,.22);
+}
+/* 逾期优先级更高：焦点的强调色让位给红色竖条（信息性优先） */
+.todo--focus.overdue{border-left-color:var(--danger)}
+
+/* ---------- 子项 ---------- */
+.todo--child{border-left-width:0}
+.todo--child .todo-text{word-break:break-word}
+
+/* ---------- 子项进度 ---------- */
+.todo-progress{
+  flex:none;align-self:center;margin-left:6px;
+  font-size:10px;color:var(--faint);
+  font-variant-numeric:tabular-nums;letter-spacing:.2px;
+}
+.todo-progress.all-done{color:var(--success)}
+
+/* ---------- 折叠箭头 ---------- */
+.todo-chevron{
+  width:20px;height:20px;padding:0;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;border-radius:4px;
+  color:var(--faint);cursor:pointer;transition:.15s;
+}
+.todo-chevron:hover{color:var(--accent);background:var(--hover)}
+.todo-chevron svg{transition:transform .15s}
+.todo-chevron.collapsed svg{transform:rotate(-90deg)}
+
+/* 专注按钮的已激活态 */
+.todo-actions .focus-btn.on{color:var(--accent);background:var(--accent-light)}

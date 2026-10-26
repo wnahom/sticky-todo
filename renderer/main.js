@@ -1,5 +1,5 @@
 // ============================================================
-// 主窗口入口：列表 + 提醒面板 + 设置面板 + 快捷键
+// 主窗口入口：列表（含子项）+ 提醒面板 + 设置面板 + 快捷键
 // ============================================================
 import { $, toLocalDateInput, toLocalTimeInput } from "./utils.js";
 import { store, renderList, wireToggle, onMinuteTick } from "./core.js";
@@ -7,6 +7,15 @@ import { store, renderList, wireToggle, onMinuteTick } from "./core.js";
 const api = window.sticky;
 
 let alarmTargetId = null;
+
+/** 折叠中的父项 id。主窗口默认展开，便于管理子项 */
+const collapsed = new Set();
+
+/** 行内编辑目标：childId 为 null 表示编辑父项本身 */
+let editing = null;
+
+/** 正在输入的子项输入框 */
+let childInput = null;
 
 /** 输入法组合期间不要触发提交（中文输入按 Enter 是上屏，不是确认） */
 const isComposing = (e) => e.isComposing || e.keyCode === 229;
@@ -18,20 +27,22 @@ function render() {
 
   // 重渲染会重建 innerHTML，先记录焦点与滚动位置，稍后还原
   const active = document.activeElement;
-  const refocusId = active && active.id === "todoInput" ? "todoInput" : null;
+  const keepInput = active && active.id === "todoInput";
   const list = $("todoList");
   const scrollTop = list.scrollTop;
 
   renderList(list, store.visible(), {
     variant: "main",
     emptyText: store.todos.length ? "没有匹配的待办" : "还没有待办事项",
+    focusId: store.focusId,
+    isCollapsed: (id) => collapsed.has(id),
   });
-  if (store.editingId) mountEditor(store.editingId);
+  if (editing) mountEditor();
 
   list.scrollTop = scrollTop;
   // 编辑态下输入框有自己的焦点，不要抢回来
-  if (refocusId && !store.editingId) {
-    const el = $(refocusId);
+  if (keepInput && !editing) {
+    const el = $("todoInput");
     if (el && el.selectionStart === 0 && el.selectionEnd === 0) {
       el.focus();
       el.setSelectionRange(el.value.length, el.value.length);
@@ -64,33 +75,60 @@ document.querySelectorAll("[data-filter]").forEach((btn) => {
 wireToggle($("todoList"));
 
 $("todoList").addEventListener("click", async (e) => {
+  const action = e.target.closest("[data-action]")?.dataset?.action;
+  if (!action || action === "toggle") return; // toggle 由 wireToggle 处理
+
+  // 子项行
+  const childRow = e.target.closest(".todo--child");
+  if (childRow) {
+    const { parent: parentId, child: childId } = childRow.dataset;
+    if (action === "delete-child") await store.removeChild(parentId, childId);
+    else if (action === "edit") startEdit(parentId, childId);
+    return;
+  }
+
+  // 父项行
   const item = e.target.closest(".todo[data-id]");
   if (!item) return;
   const id = item.dataset.id;
-  const action = e.target.closest("[data-action]")?.dataset?.action;
 
   if (action === "delete") await store.remove(id);
   else if (action === "alarm") openAlarm(id);
-  else if (action === "edit") startEdit(id);
+  else if (action === "edit") startEdit(id, null);
+  else if (action === "focus") await store.setFocus(id);
+  else if (action === "add-child") openChildInput(id);
+  else if (action === "collapse") toggleCollapse(id);
 });
 
-// ---------- 行内编辑 ----------
-function startEdit(id) {
-  if (store.editingId) return;
-  store.setEditing(id);
+/** 折叠/展开父项 */
+function toggleCollapse(id) {
+  if (collapsed.has(id)) collapsed.delete(id);
+  else collapsed.add(id);
+  render();
 }
 
-function mountEditor(id) {
-  const item = document.querySelector(`.todo[data-id="${id}"]`);
-  if (!item) { store.setEditing(null); return; }
+// ---------- 行内编辑（父项与子项共用） ----------
+function startEdit(parentId, childId = null) {
+  if (editing) return;
+  editing = { parentId, childId };
+  render(); // 由 render → mountEditor 统一挂载，避免两处逻辑
+}
 
-  const target = item.querySelector(".todo-text");
-  const t = store.todos.find((x) => x.id === id);
-  if (!target || !t) { store.setEditing(null); return; }
+function mountEditor() {
+  const { parentId, childId } = editing;
+  const selector = childId
+    ? `.todo--child[data-child="${childId}"]`
+    : `.todo[data-id="${parentId}"]`;
+  const row = document.querySelector(selector);
+  const original = childId
+    ? store.childrenOf(parentId).find((c) => c.id === childId)
+    : store.byId(parentId);
+  const target = row && row.querySelector(".todo-text");
+  if (!row || !target || !original) { editing = null; return; }
 
   const inp = document.createElement("input");
   inp.className = "edit-input";
-  inp.value = t.text;
+  inp.value = original.text;
   target.replaceWith(inp);
   inp.focus();
   inp.select();
@@ -100,21 +138,76 @@ function mountEditor(id) {
     if (settled) return;
     settled = true;
     const v = inp.value.trim();
-    store.setEditing(null); // 先清状态再触发重渲染，避免递归
-    if (save && v && v !== t.text) await store.update(id, { text: v });
-    else render();
+    editing = null; // 先清状态再触发重渲染，避免递归
+    if (save && v && v !== original.text) {
+      if (childId) await store.renameChild(parentId, childId, v);
+      else await store.update(parentId, { text: v });
+    } else render();
   };
 
   inp.addEventListener("blur", () => finish(true));
   inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter") inp.blur();
-    else if (e.key === "Escape") { inp.value = t.text; inp.blur(); }
+    else if (e.key === "Escape") { inp.value = original.text; inp.blur(); }
+  });
+}
+
+// ---------- 添加子项 ----------
+function closeChildInput() {
+  if (childInput) {
+    childInput.wrap.remove();
+    childInput = null;
+  }
+}
+
+/** 在指定父项下方展开一个输入框，支持连续回车添加 */
+function openChildInput(parentId) {
+  closeChildInput();
+  if (collapsed.has(parentId)) {
+    collapsed.delete(parentId);
+    render();
+  }
+  const row = document.querySelector(`.todo[data-id="${parentId}"]`);
+  if (!row) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "todo-child-input no-drag";
+  wrap.innerHTML = `<span class="todo-check"></span>
+    <input type="text" placeholder="子项内容，Enter 添加，Esc 取消">`;
+  row.after(wrap);
+  childInput = { wrap, parentId };
+
+  const inp = wrap.querySelector("input");
+  inp.focus();
+
+  let busy = false;
+  const close = () => {
+    if (childInput && childInput.wrap === wrap) {
+      wrap.remove();
+      childInput = null;
+    }
+  };
+
+  // 失焦就收起（保留 busy 期间，避免重渲染导致的误关）
+  inp.addEventListener("blur", () => { if (!busy) close(); });
+
+  inp.addEventListener("keydown", async (e) => {
+    if (e.key === "Escape") { busy = true; close(); return; }
+    if (e.key !== "Enter" || isComposing(e)) return;
+    const text = inp.value.trim();
+    if (!text) { busy = true; close(); return; }
+    busy = true;
+    inp.value = "";
+    const ok = await store.addChild(parentId, text);
+    busy = false;
+    if (ok) openChildInput(parentId); // 连续添加
+    else close();
   });
 }
 
 // ---------- 提醒面板 ----------
 function openAlarm(id) {
-  const t = store.todos.find((x) => x.id === id);
+  const t = store.byId(id);
   if (!t) return;
   alarmTargetId = id;
   const now = new Date();
@@ -214,6 +307,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     document.querySelectorAll(".overlay:not(.hidden)").forEach((el) => el.classList.add("hidden"));
     alarmTargetId = null;
+    closeChildInput();
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
     e.preventDefault();
@@ -229,7 +323,7 @@ document.querySelectorAll(".overlay").forEach((el) => {
 // ---------- 启动 ----------
 store.subscribe(render);
 api.onTodosChanged((todos) => store.setTodos(todos));
-api.onConfigChanged((c) => { Object.assign(store.config, c); });
+api.onConfigChanged((c) => store.applyConfig(c));
 // 托盘「新建待办」唤出窗口后把光标送进输入框
 api.onFocusInput(() => {
   const el = $("todoInput");
@@ -238,7 +332,6 @@ api.onFocusInput(() => {
 // 提醒到点：把主窗口带到前台，方便直接处理
 api.onAlarms((list) => {
   if (list && list.length) {
-    // 不强制抢焦点，只在窗口已打开时刷新列表（数据变更会经 todos-changed 推送）
     console.log("[sticky] 有新的提醒:", list.map((t) => t.text).join(" / "));
   }
 });
@@ -255,6 +348,7 @@ onMinuteTick(render);
 (async () => {
   try {
     await store.load();
+    await store.loadConfig(); // 专注状态存在配置里，必须初始加载
   } catch (e) {
     console.error("[sticky] 初始加载失败:", e);
     const list = $("todoList");

@@ -346,6 +346,30 @@ function createTile() {
   });
   tileWin.on("move", rememberTileBounds);
   tileWin.on("resize", rememberTileBounds);
+  /**
+   * 点击磁贴会让它失去置顶。
+   *
+   * 实测（正式版、副屏 150%、同屏还有全屏窗口时）：鼠标点击磁贴的同一瞬间
+   * WS_EX_TOPMOST 被清掉，之后一直保持 false —— 表现为"点一下，磁贴就沉到
+   * 其它窗口下面，而且再点也拉不回来"。
+   * 机制是窗口被激活时 Chromium 会按缓存的扩展样式重置一次窗口样式，
+   * TOPMOST 位被顺带抹掉。
+   *
+   * 因此在激活后补回一次。这里必须用 false→true 强制下发：
+   * Electron 内部状态可能仍认为是置顶，直接 setAlwaysOnTop(true) 会被当成
+   * "没变化"而跳过。只在点击/激活时触发一次，不做轮询，所以不会持续闪烁。
+   */
+  tileWin.on("focus", () => {
+    setTimeout(() => {
+      if (!tileWin || tileWin.isDestroyed() || !tileWin.isVisible()) return;
+      try {
+        tileWin.setAlwaysOnTop(false);
+        tileWin.setAlwaysOnTop(true);
+      } catch (e) {
+        console.error("[sticky] 恢复磁贴置顶失败:", e.message);
+      }
+    }, 0);
+  });
   tileWin.on("closed", () => {
     tileWin = null;
     if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }

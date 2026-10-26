@@ -196,11 +196,20 @@ export const store = {
     return this.update(parentId, { children });
   },
 
-  async addChild(parentId, text) {
+  /**
+   * 添加子项。afterChildId 指定插在该子项之后（编辑某个子项时继续加"下一个"），
+   * 省略则追加到末尾。返回新子项对象，失败返回 null。
+   */
+  async addChild(parentId, text, afterChildId = null) {
     const clean = String(text ?? "").trim();
     if (!clean) return null;
-    const children = [...this.childrenOf(parentId), { id: newChildId(), text: clean, done: false }];
-    return this.setChildren(parentId, children);
+    const children = [...this.childrenOf(parentId)];
+    const child = { id: newChildId(), text: clean, done: false };
+    const idx = afterChildId ? children.findIndex((c) => c.id === afterChildId) : -1;
+    if (idx >= 0) children.splice(idx + 1, 0, child);
+    else children.push(child);
+    const ok = await this.setChildren(parentId, children);
+    return ok ? child : null;
   },
 
   async removeChild(parentId, childId) {

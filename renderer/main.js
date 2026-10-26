@@ -14,8 +14,15 @@ const collapsed = new Set();
 /** 行内编辑目标：childId 为 null 表示编辑父项本身 */
 let editing = null;
 
-/** 正在输入的子项输入框 */
-let childInput = null;
+/** 正在输入的子项输入框状态（DOM 由 render 负责重建，不直接持有） */
+let childDraft = null;
+
+/**
+ * render() 重建列表时会摘掉旧输入框，而 blur 是在摘除过程中同步触发的
+ * ——那一刻元素仍算 connected，会被误判成"用户点了别处"而关闭输入框。
+ * 用这个同步标志把这段窗口挡掉。
+ */
+let suppressChildBlur = false;
 
 /** 输入法组合期间不要触发提交（中文输入按 Enter 是上屏，不是确认） */
 const isComposing = (e) => e.isComposing || e.keyCode === 229;
@@ -31,13 +38,18 @@ function render() {
   const list = $("todoList");
   const scrollTop = list.scrollTop;
 
+  suppressChildBlur = true;
   renderList(list, store.visible(), {
     variant: "main",
     emptyText: store.todos.length ? "没有匹配的待办" : "还没有待办事项",
     focusId: store.focusId,
     isCollapsed: (id) => collapsed.has(id),
   });
+  suppressChildBlur = false;
+
   if (editing) mountEditor();
+  // 子项输入框也是 render 的产物：重渲染后必须重新挂出来，否则会被抹掉
+  if (childDraft) mountChildInput();
 
   list.scrollTop = scrollTop;
   // 编辑态下输入框有自己的焦点，不要抢回来
@@ -134,8 +146,10 @@ function mountEditor() {
   inp.select();
 
   let settled = false;
-  // Shift+Enter：保存本次修改后立刻展开子项输入，便于连续录入多个子项
+  // Shift+Enter：保存本次修改后立刻展开子项输入，便于连续录入多个子项。
+  // 从子项行触发时，新子项插在该子项之后；从父项行触发则追加到末尾。
   let openChildAfter = false;
+  let openChildAfterId = null;
 
   const finish = async (save) => {
     if (settled) return;
@@ -149,16 +163,18 @@ function mountEditor() {
     // 渲染完成后再挂输入框，保证父项行已存在
     if (openChildAfter) {
       openChildAfter = false;
-      openChildInput(parentId);
+      openChildInput(parentId, openChildAfterId);
     }
   };
 
   inp.addEventListener("blur", () => finish(true));
   inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
-      // Shift+Enter 只对父项生效：保存文字后直接展开子项输入。
-      // 子项本身按 Enter 就是保存，没有更深一层。
-      if (e.shiftKey && !childId) openChildAfter = true;
+      // 父项与子项都支持：父项→从头加子项，子项→在该子项后面接着加
+      if (e.shiftKey) {
+        openChildAfter = true;
+        openChildAfterId = childId || null;
+      }
       e.preventDefault();
       inp.blur();
     } else if (e.key === "Escape") {
@@ -170,55 +186,73 @@ function mountEditor() {
 }
 
 // ---------- 添加子项 ----------
+// 输入框是 #todoList 里的一行，而 render() 会重建该容器 —— 所以不能把 DOM
+// 当作状态：这里只保存 childDraft，由 render() 负责把它重新挂出来。
+// （否则任何一次重渲染，包括每分钟的时间刷新，都会把输入框抹掉）
 function closeChildInput() {
-  if (childInput) {
-    childInput.wrap.remove();
-    childInput = null;
-  }
+  if (!childDraft) return;
+  childDraft = null;
+  const el = document.querySelector("#todoList .todo-child-input");
+  if (el) el.remove();
 }
 
-/** 在指定父项下方展开一个输入框，支持连续回车添加 */
-function openChildInput(parentId) {
-  closeChildInput();
-  if (collapsed.has(parentId)) {
-    collapsed.delete(parentId);
-    render();
-  }
-  const row = document.querySelector(`.todo[data-id="${parentId}"]`);
-  if (!row) return;
+/**
+ * 打开子项输入框（连续回车可继续添加）。
+ * afterChildId：新子项插入在该子项之后；省略则追加到末尾。
+ */
+function openChildInput(parentId, afterChildId = null) {
+  if (collapsed.has(parentId)) collapsed.delete(parentId);
+  childDraft = { parentId, insertAfter: afterChildId, value: "" };
+  render(); // 由 render → mountChildInput 统一挂载
+}
+
+/** 按 childDraft 在列表里挂出输入框（每次 render 后调用） */
+function mountChildInput() {
+  const draft = childDraft;
+  if (!draft) return;
+  const row = document.querySelector(`.todo[data-id="${draft.parentId}"]`);
+  if (!row) { childDraft = null; return; }
+
+  const anchor = draft.insertAfter
+    ? document.querySelector(`.todo--child[data-child="${draft.insertAfter}"]`)
+    : null;
 
   const wrap = document.createElement("div");
   wrap.className = "todo-child-input no-drag";
   wrap.innerHTML = `<span class="todo-check"></span>
     <input type="text" placeholder="子项内容，Enter 添加，Esc 取消">`;
-  row.after(wrap);
-  childInput = { wrap, parentId };
+  (anchor || row).after(wrap);
 
   const inp = wrap.querySelector("input");
+  inp.value = draft.value || "";
   inp.focus();
+  inp.setSelectionRange(inp.value.length, inp.value.length);
 
-  let busy = false;
-  const close = () => {
-    if (childInput && childInput.wrap === wrap) {
-      wrap.remove();
-      childInput = null;
-    }
-  };
+  // 记住正在输入的内容，重渲染后可以原样恢复
+  inp.addEventListener("input", () => { if (childDraft === draft) draft.value = inp.value; });
 
-  // 失焦就收起（保留 busy 期间，避免重渲染导致的误关）
-  inp.addEventListener("blur", () => { if (!busy) close(); });
+  inp.addEventListener("blur", () => {
+    // 重渲染导致的摘除不算失焦；否则输入框刚重建就被自己关掉
+    if (suppressChildBlur || !wrap.isConnected) return;
+    closeChildInput();
+  });
 
   inp.addEventListener("keydown", async (e) => {
-    if (e.key === "Escape") { busy = true; close(); return; }
+    if (e.key === "Escape") { e.preventDefault(); closeChildInput(); return; }
     if (e.key !== "Enter" || isComposing(e)) return;
+    e.preventDefault();
     const text = inp.value.trim();
-    if (!text) { busy = true; close(); return; }
-    busy = true;
-    inp.value = "";
-    const ok = await store.addChild(parentId, text);
-    busy = false;
-    if (ok) openChildInput(parentId); // 连续添加
-    else close();
+    if (!text) { closeChildInput(); return; }
+    const parentId = draft.parentId;
+    const insertAfter = draft.insertAfter;
+    draft.value = ""; // 重渲染时挂出空白框
+    const created = await store.addChild(parentId, text, insertAfter);
+    if (!created) return; // 失败已由 attempt 弹提示，输入框保留
+    if (childDraft === draft) {
+      childDraft.insertAfter = created.id; // 下一条排在这条之后
+      childDraft.value = "";
+      render();
+    }
   });
 }
 

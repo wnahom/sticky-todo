@@ -79,11 +79,29 @@ function ask(question) {
   return new Promise((res) => rl.question(question, (a) => { rl.close(); res(a.trim()); }));
 }
 
-/** 找出占用目标 asar 的运行中主进程 */
-function runningPids(exeName) {
+/**
+ * 找出占用目标 asar 的运行中主进程。
+ *
+ * 必须按「可执行文件的完整路径」匹配，而不是只按进程名：
+ * 同一台机器上可能同时存在正式版与测试副本（同名 exe），
+ * 只按名字会把另一个实例一起杀掉。
+ */
+function runningPids(exeName, targetDir) {
+  const wanted = path.join(targetDir, `${exeName}.exe`).toLowerCase();
   try {
-    const out = execFileSync("tasklist", ["/FI", `IMAGENAME eq ${exeName}.exe`, "/FO", "CSV", "/NH"], { encoding: "utf8" });
-    return out.split(/\r?\n/).filter((l) => l.toLowerCase().startsWith(`"${exeName.toLowerCase()}.exe"`)).map((l) => l.split('","')[1]);
+    const ps = `Get-CimInstance Win32_Process -Filter "Name='${exeName}.exe'" | ForEach-Object { "$($_.ProcessId)|$($_.ExecutablePath)" }`;
+    const out = execFileSync("powershell", ["-NoProfile", "-Command", ps], { encoding: "utf8" });
+    return out
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const i = l.indexOf("|");
+        return { pid: l.slice(0, i), exe: l.slice(i + 1) };
+      })
+      // 拿不到路径时保守保留（宁可多问一句，也不要漏杀导致替换失败）
+      .filter((r) => !r.exe || r.exe.toLowerCase() === wanted)
+      .map((r) => r.pid);
   } catch {
     return [];
   }
@@ -152,7 +170,7 @@ function runningPids(exeName) {
   if (!fs.existsSync(targetAsar)) die(`${TARGET} 下没有 resources/app.asar，可能不是有效的安装目录`);
   if (!fs.existsSync(exePath)) die(`找不到可执行文件: ${exePath}（可用 --exe 指定）`);
 
-  const pids = runningPids(EXE);
+  const pids = runningPids(EXE, TARGET);
   if (pids.length) {
     warn(`正式版正在运行 (PID ${pids.join(",")})，app.asar 被占用`);
     let go = YES;

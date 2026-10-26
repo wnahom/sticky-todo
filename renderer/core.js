@@ -58,7 +58,7 @@ const state = {
   todos: [],
   config: {
     opacity: 0.92, alarmSound: true, tileWidth: 260, tileHeight: 360,
-    tileBounds: null, tilePinned: true, focusId: null,
+    tileBounds: null, focusId: null,
   },
   filter: "all",
 };

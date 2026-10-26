@@ -18,22 +18,14 @@ body{
 /* ---------- 拖拽条 ---------- */
 .tile-header{
   display:flex;align-items:center;gap:4px;
-  padding:4px 6px;
+  padding:4px 6px;min-height:22px;
   border-bottom:1px solid rgba(196,154,108,.12);
   cursor:grab;
 }
 .tile-header:active{cursor:grabbing}
 
-.tile-title{font-size:10px;color:var(--faint);letter-spacing:.5px}
-
-.tile-pinbtn{
-  width:22px;height:22px;margin-right:auto;
-  display:flex;align-items:center;justify-content:center;
-  border:none;border-radius:3px;background:transparent;
-  color:var(--accent);opacity:.4;cursor:pointer;transition:.12s;
-}
-.tile-pinbtn:hover{opacity:1;background:rgba(196,154,108,.1)}
-.tile-pinbtn.active{opacity:.8}
+/* 磁贴恒定置顶，没有开关按钮，标题靠右 */
+.tile-title{font-size:10px;color:var(--faint);letter-spacing:.5px;margin-left:auto}
 
 /* ---------- 快速新增 ---------- */
 .tile-input{

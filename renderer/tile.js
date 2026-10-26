@@ -72,20 +72,6 @@ $("tileInput").addEventListener("keydown", (e) => {
 });
 $("tileAddBtn").addEventListener("click", addFromTile);
 
-// ---------- 置顶切换 ----------
-// 按钮状态以主进程的 isAlwaysOnTop() 为准，避免窗口重建后显示与实际不一致
-async function syncPinState() {
-  try {
-    const pinned = await api.tile.pinned();
-    $("tilePinBtn").classList.toggle("active", !!pinned);
-  } catch { /* 忽略，保持默认 */ }
-}
-
-$("tilePinBtn").addEventListener("click", async () => {
-  const pinned = await api.tile.pin();
-  $("tilePinBtn").classList.toggle("active", !!pinned);
-});
-
 // ---------- Esc 关闭磁贴 ----------
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") api.tile.hide();
@@ -96,7 +82,6 @@ store.subscribe(render);
 api.onTodosChanged((todos) => store.setTodos(todos));
 api.onConfigChanged((c) => store.applyConfig(c)); // 专注变化要立即反映
 onMinuteTick(render);
-syncPinState();
 
 (async () => {
   try {

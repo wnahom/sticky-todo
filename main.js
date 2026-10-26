@@ -37,7 +37,6 @@ const DEFAULT_CONFIG = {
   tileWidth: 260,
   tileHeight: 360,
   tileBounds: null,
-  tilePinned: true,
   focusId: null, // 当前专注的待办 id；只存一条，属于界面状态
 };
 
@@ -183,8 +182,6 @@ let tileSaveTimer = null;
  */
 let boundsDirty = false;
 let boundsTimer = null;
-/** 置顶看门狗：定期检查磁贴是否真的置顶，被系统丢掉时补回 */
-let tileWatch = null;
 
 function createMain() {
   if (mainWin && !mainWin.isDestroyed()) {
@@ -256,36 +253,20 @@ function usableBounds(saved) {
   return { x, y, width: fitW, height: fitH };
 }
 
-/** 置顶的意图以配置为准（窗口的实际 TOPMOST 位可能被系统事件丢掉） */
-function tilePinnedIntent() {
-  return cfg().tilePinned !== false;
-}
-
 /**
- * 把置顶意图落到磁贴窗口上。
+ * 磁贴恒定置顶，没有开关、也没有轮询。
  *
- * 背景：窗口的 WS_EX_TOPMOST 位会被系统在各种时机丢掉（跨显示器、点击、拖动…），
- * 丢掉之后窗口就沉到其它窗口下面，而且"点它/拖它"也回不到顶层 —— 这不是用户
- * 期待的普通窗口行为。
- *
- * 实测 Electron 的 isAlwaysOnTop() 会跟随系统的真实状态，因此这里只在真的
- * 不一致时才下发一次，避免每次调用都把窗口重新排一次（会造成闪烁）。
+ * 只在窗口真正显示之后下发一次：构造参数里的 alwaysOnTop 有时会被随后的
+ * setBounds / setOpacity 抹掉（高 DPI 迁移时尤其明显）。
+ * 之前试过"发现不一致就补"的轮询，系统反复丢、我们反复补，表现为一直闪烁，
+ * 因此这里只做一次性设置，之后不再干预。
  */
-function applyTilePinned() {
+function keepTileOnTop() {
   if (!tileWin || tileWin.isDestroyed()) return;
-  if (tileWin.isMinimized() || !tileWin.isVisible()) return;
-  const want = tilePinnedIntent();
-  let actual;
   try {
-    actual = tileWin.isAlwaysOnTop();
-  } catch {
-    return;
-  }
-  if (actual === want) return;
-  try {
-    tileWin.setAlwaysOnTop(want);
+    tileWin.setAlwaysOnTop(true);
   } catch (e) {
-    console.error("[sticky] 应用置顶状态失败:", e.message);
+    console.error("[sticky] 设置置顶失败:", e.message);
   }
 }
 
@@ -298,7 +279,6 @@ function rememberTileBounds() {
     const b = tileWin.getBounds();
     saveConfig({ tileBounds: b, tileWidth: b.width, tileHeight: b.height });
     broadcastTileBounds(b); // 让设置面板滑块同步，避免与拖拽结果不一致
-    applyTilePinned(); // 跨屏拖动后系统可能丢掉置顶，这里补回
   }, 500);
 }
 
@@ -326,7 +306,7 @@ function createTile() {
   tileWin = new BrowserWindow({
     frame: false,
     transparent: true,
-    alwaysOnTop: tilePinnedIntent(),
+    alwaysOnTop: true, // 磁贴恒定居最前，不提供开关
     skipTaskbar: true,
     resizable: true,
     show: false,
@@ -353,7 +333,7 @@ function createTile() {
     if (win.isDestroyed() || boundsDirty) return;
     win.setOpacity(c.opacity ?? 0.92); // 首启不透明的问题在此一并修正
     win.show();
-    applyTilePinned(); // 显示之后再落一次置顶，防止系统在迁移显示器时丢掉
+    keepTileOnTop(); // setBounds/setOpacity 可能抹掉置顶，显示后补一次（仅此一次）
 
     boundsTimer = setTimeout(() => {
       if (win.isDestroyed() || boundsDirty) return;
@@ -362,21 +342,13 @@ function createTile() {
           (bounds.x !== undefined && (b.x !== bounds.x || b.y !== bounds.y))) {
         applyTileBounds(bounds); // 兜底纠正被缩放掉的尺寸
       }
-      applyTilePinned();
     }, 400);
   });
   tileWin.on("move", rememberTileBounds);
   tileWin.on("resize", rememberTileBounds);
-  // 点击磁贴（聚焦）时也补一次：实测点击会让系统丢掉 TOPMOST 位
-  tileWin.on("focus", applyTilePinned);
-  // 看门狗：系统在任何时刻丢掉置顶位都能在 1 秒内补回。
-  // 已经置顶时 applyTilePinned 会直接返回，不做任何窗口操作。
-  if (tileWatch) clearInterval(tileWatch);
-  tileWatch = setInterval(applyTilePinned, 1000);
   tileWin.on("closed", () => {
     tileWin = null;
     if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
-    if (tileWatch) { clearInterval(tileWatch); tileWatch = null; }
   });
 }
 
@@ -402,7 +374,7 @@ function toggleTile() {
     else {
       tileWin.show();
       tileWin.focus();
-      applyTilePinned(); // 重新显示时按配置补回置顶
+      keepTileOnTop(); // 隐藏/显示会让窗口重建 z-order，这里补一次
     }
   } else {
     createTile();
@@ -821,15 +793,6 @@ function setupIPC() {
 
   ipcMain.handle("tile:show", () => toggleTile());
   ipcMain.handle("tile:hide", () => { if (tileWin && !tileWin.isDestroyed()) tileWin.hide(); });
-  ipcMain.handle("tile:pinned", () => tilePinnedIntent());
-  ipcMain.handle("tile:pin", () => {
-    // 以配置为唯一真相：窗口的 TOPMOST 位可能被系统丢掉，
-    // 若拿 isAlwaysOnTop() 取反，会和用户看到的按钮状态脱节
-    const next = !tilePinnedIntent();
-    saveConfig({ tilePinned: next });
-    applyTilePinned();
-    return next;
-  });
 
   /** 磁贴当前实际尺寸；窗口没开时回落到配置值 */
   ipcMain.handle("tile:bounds", () => {

@@ -30,8 +30,6 @@ contextBridge.exposeInMainWorld("sticky", {
   tile: {
     show: () => ipcRenderer.invoke("tile:show"),
     hide: () => ipcRenderer.invoke("tile:hide"),
-    pin: () => ipcRenderer.invoke("tile:pin"),
-    pinned: () => ipcRenderer.invoke("tile:pinned"),
     bounds: () => ipcRenderer.invoke("tile:bounds"),
     resize: (w, h) => ipcRenderer.invoke("tile:resize", w, h),
   },
